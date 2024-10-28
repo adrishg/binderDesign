@@ -10,7 +10,7 @@
 
 project_name="testPipeline_Cav22_AID"
 project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test/"
-pdb_target="/share/yarovlab/ahgz/Binders/Test_Pipeline/inputs7miy_truncated.pdb"
+pdb_target="/share/yarovlab/ahgz/Binders/Test_Pipeline/inputs/7miy_truncated.pdb"
 hostpots=""
 #Receives
 #project_name, pdb_target, hotspots, ...?
