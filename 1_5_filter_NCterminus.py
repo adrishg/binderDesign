@@ -7,6 +7,9 @@ import numpy as np
 from itertools import combinations, product
 import shutil
 
+# Repurposed from epitope stabilization
+# Missing recognition of interaction region (polygly until these point)
+
 def parse_pdb(filename):
     with open(filename, 'r') as file:
         lines = file.readlines()
@@ -71,7 +74,7 @@ def analyze_pdb(pdb_file, epitope, padding, tolerance):
     sequence = get_sequence(residues)
     epitope_start = find_epitope_location(sequence, epitope)
     epitope_end = epitope_start + len(epitope) - 1
-    
+
     if epitope_start == -1:
         print(f"{pdb_file}: Epitope not found in the sequence.")
         return None
@@ -173,10 +176,12 @@ def main(pdb_directory, epitope, padding=20.0, tolerance=80.0, output_dir='outpu
         src_path = pdb_file
         dst_path = os.path.join(output_filtered_dir, os.path.basename(pdb_file))
         shutil.copy(src_path, dst_path)
-    
+
     print(f"Filtered PDB files copied to {output_filtered_dir}")
     return filtered_pdb_files
 
+
+# Usage
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze PDB files for epitope and terminal positions.")
     parser.add_argument("-d", "--directory", required=True, help="Directory containing PDB files")
@@ -194,4 +199,3 @@ if __name__ == "__main__":
     output_dir = args.output
 
     main(pdb_directory, epitope_sequence, padding, tolerance, output_dir)
-
