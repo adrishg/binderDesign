@@ -2,7 +2,7 @@
 #SBATCH -p gpu-vladimir     # Partition name
 #SBATCH --gres=gpu:4        # Request 1 GPUs
 #SBATCH -t 1-12:00:00       # 1 day just in case
-#SBATCH --job-name=dimer1Chain-2CaMs #Job name
+#SBATCH --job-name=RFDiffusion #Job name
 #SBATCH --mem=240G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu #mail me after run
 #SBATCH --mail-type=END #mail at end of run
