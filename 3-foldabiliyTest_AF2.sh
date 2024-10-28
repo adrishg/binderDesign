@@ -7,11 +7,6 @@
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END           # Mail at end of run
 
-# Default values for variables
-SEQ_FOLDER='/share/yarovlab/ahgz/a2d4-nanobodies/2-pMPNN/test0/output/seqs/'
-OUTPUT_DIR_BASE='/share/yarovlab/ahgz/a2d4-nanobodies/2-pMPNN/test0/output/seqs/output'
-CONDA_ENV_PATH='/share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/'
-
 
 # Usage:
 usage() {
