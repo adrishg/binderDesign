@@ -12,8 +12,6 @@ source /share/yarovlab/ahgz/.bashrc
 source activate mlfold
 
 # Variables (default values)
-folder_with_pdbs="/share/yarovlab/ahgz/a2d4-nanobodies/1-RFdiff/epitopeTOP/Test-1/"
-output_dir="/share/yarovlab/ahgz/a2d4-nanobodies/2-pMPNN/test0/output/"
 chains_to_design="A"
 
 # Function to display usage
