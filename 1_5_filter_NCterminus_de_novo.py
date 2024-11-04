@@ -4,11 +4,8 @@ import math
 import argparse
 import pandas as pd
 import numpy as np
-from itertools import combinations, product
+from itertools import groupby
 import shutil
-
-# Repurposed from epitope stabilization
-# Missing recognition of interaction region (alln polygly since it is not scaffolded until these point)
 
 def parse_pdb(filename):
     with open(filename, 'r') as file:
@@ -29,30 +26,32 @@ def get_residue_atoms(atoms):
         residues[(chain, res_num)] = (res_name, atom_name, x, y, z)
     return residues
 
-def three_to_one(three):
-    mapping = {
-        'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-        'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-        'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-        'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
-    }
-    return mapping.get(three, 'X')
+def find_interacting_region(residues, chain_a='A', chain_b='B', interaction_cutoff=5.0):
+    interacting_residues = []
+    chain_a_atoms = [(key, coords) for key, coords in residues.items() if key[0] == chain_a]
+    chain_b_atoms = [(key, coords) for key, coords in residues.items() if key[0] == chain_b]
 
-def get_sequence(residues):
-    return ''.join(three_to_one(res[0]) for res in residues.values())
+    for (res_a, a_coords) in chain_a_atoms:
+        for (res_b, b_coords) in chain_b_atoms:
+            dist = calculate_distance(a_coords[2:], b_coords[2:])
+            if dist <= interaction_cutoff:
+                interacting_residues.append(res_a[1])
+                break
 
-def find_epitope_location(sequence, epitope):
-    return sequence.find(epitope)
+    if not interacting_residues:
+        return []
 
-def get_terminal_positions(residues):
-    chains = list(set(chain for chain, _ in residues.keys()))
-    terminals = {}
-    for chain in chains:
-        chain_residues = sorted(num for ch, num in residues.keys() if ch == chain)
-        n_terminal = chain_residues[0]
-        c_terminal = chain_residues[-1]
-        terminals[chain] = (n_terminal, c_terminal)
-    return terminals
+    # Find the largest continuous interacting region
+    interacting_residues.sort()
+    groups = [list(group) for _, group in groupby(interacting_residues, key=lambda n, c=count(): n - next(c))]
+    largest_region = max(groups, key=len)
+    return largest_region
+
+def get_terminal_positions(residues, chain):
+    chain_residues = sorted(num for ch, num in residues.keys() if ch == chain)
+    n_terminal = chain_residues[0]
+    c_terminal = chain_residues[-1]
+    return n_terminal, c_terminal
 
 def calculate_distance(coord1, coord2):
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(coord1, coord2)))
@@ -68,81 +67,67 @@ def calculate_angle(vector1, vector2):
 def get_average_vector(coords):
     return np.mean(coords, axis=0)
 
-def analyze_pdb(pdb_file, epitope, padding, tolerance):
+def analyze_pdb(pdb_file, padding, tolerance, interaction_cutoff):
     atoms = parse_pdb(pdb_file)
     residues = get_residue_atoms(atoms)
-    sequence = get_sequence(residues)
-    epitope_start = find_epitope_location(sequence, epitope)
-    epitope_end = epitope_start + len(epitope) - 1
-
-    if epitope_start == -1:
-        print(f"{pdb_file}: Epitope not found in the sequence.")
+    
+    interacting_residues = find_interacting_region(residues, interaction_cutoff=interaction_cutoff)
+    if not interacting_residues:
+        print(f"No interacting residues found between Chain A and Chain B in {pdb_file}.")
         return None
+    
+    n_terminal, c_terminal = get_terminal_positions(residues, chain='A')
+    n_terminal_coords = get_residue_coordinates(residues, 'A', n_terminal)
+    c_terminal_coords = get_residue_coordinates(residues, 'A', c_terminal)
+    
+    interacting_coords = np.array([get_residue_coordinates(residues, 'A', res) for res in interacting_residues])
+    interacting_center = interacting_coords.mean(axis=0)
+    
+    structure_center = np.array([coords[2:] for coords in residues.values()]).mean(axis=0)
+    direction_vector = interacting_center - structure_center
+    center_interacting_angle = calculate_angle(direction_vector, direction_vector)
+    
+    n_terminal_inside = all(np.abs(coord - interacting_center[i]) <= padding / 2 for i, coord in enumerate(n_terminal_coords))
+    c_terminal_inside = all(np.abs(coord - interacting_center[i]) <= padding / 2 for i, coord in enumerate(c_terminal_coords))
+    
+    n_terminal_next_coords = [get_residue_coordinates(residues, 'A', n_terminal + i) for i in range(1, 4)]
+    n_terminal_vector = np.array(n_terminal_coords) - get_average_vector(n_terminal_next_coords)
+    n_terminal_distance = np.linalg.norm(n_terminal_vector)
+    n_terminal_angle = calculate_angle(n_terminal_vector, direction_vector)
+    n_terminal_angle_diff = abs(n_terminal_angle - center_interacting_angle)
+    
+    c_terminal_prev_coords = [get_residue_coordinates(residues, 'A', c_terminal - i) for i in range(1, 4)]
+    c_terminal_vector = np.array(c_terminal_coords) - get_average_vector(c_terminal_prev_coords)
+    c_terminal_distance = np.linalg.norm(c_terminal_vector)
+    c_terminal_angle = calculate_angle(c_terminal_vector, direction_vector)
+    c_terminal_angle_diff = abs(c_terminal_angle - center_interacting_angle)
+    
+    n_terminal_opposite = (180 - tolerance) <= n_terminal_angle <= (180 + tolerance)
+    c_terminal_opposite = (180 - tolerance) <= c_terminal_angle <= (180 + tolerance)
+    
+    return {
+        'PDB': pdb_file,
+        'N_terminal_inside': 0 if n_terminal_inside else 1,
+        'C_terminal_inside': 0 if c_terminal_inside else 1,
+        'N_terminal_opposite': 1 if n_terminal_opposite else 0,
+        'C_terminal_opposite': 1 if c_terminal_opposite else 0,
+        'N_terminal_distance': n_terminal_distance,
+        'C_terminal_distance': c_terminal_distance,
+        'N_terminal_angle': n_terminal_angle,
+        'C_terminal_angle': c_terminal_angle,
+        'Center_interacting_angle': center_interacting_angle,
+        'N_terminal_angle_diff': n_terminal_angle_diff,
+        'C_terminal_angle_diff': c_terminal_angle_diff
+    }
 
-    terminals = get_terminal_positions(residues)
-    epitope_residues = range(epitope_start + 1, epitope_end + 2)
-
-    for chain, (n_terminal, c_terminal) in terminals.items():
-        n_terminal_coords = get_residue_coordinates(residues, chain, n_terminal)
-        c_terminal_coords = get_residue_coordinates(residues, chain, c_terminal)
-
-        # Center of the epitope
-        epitope_coords = np.array([get_residue_coordinates(residues, chain, res) for res in epitope_residues if get_residue_coordinates(residues, chain, res)])
-        epitope_center = epitope_coords.mean(axis=0)
-
-        # Center of the whole structure
-        all_coords = np.array([coords[2:] for coords in residues.values()])
-        structure_center = all_coords.mean(axis=0)
-
-        # Direction vector from center to epitope center
-        direction_vector = epitope_center - structure_center
-        center_epitope_angle = calculate_angle(direction_vector, direction_vector)  # Should be 0
-
-        # Check if terminals are inside the cube
-        n_terminal_inside = all(np.abs(coord - epitope_center[i]) <= padding / 2 for i, coord in enumerate(n_terminal_coords))
-        c_terminal_inside = all(np.abs(coord - epitope_center[i]) <= padding / 2 for i, coord in enumerate(c_terminal_coords))
-
-        # N-terminal direction
-        n_terminal_next_coords = [get_residue_coordinates(residues, chain, n_terminal + i) for i in range(1, 4)]
-        n_terminal_vector = np.array(n_terminal_coords) - get_average_vector(n_terminal_next_coords)
-        n_terminal_distance = np.linalg.norm(n_terminal_vector)
-        n_terminal_angle = calculate_angle(n_terminal_vector, direction_vector)
-        n_terminal_angle_diff = abs(n_terminal_angle - center_epitope_angle)
-
-        # C-terminal direction
-        c_terminal_prev_coords = [get_residue_coordinates(residues, chain, c_terminal - i) for i in range(1, 4)]
-        c_terminal_vector = np.array(c_terminal_coords) - get_average_vector(c_terminal_prev_coords)
-        c_terminal_distance = np.linalg.norm(c_terminal_vector)
-        c_terminal_angle = calculate_angle(c_terminal_vector, direction_vector)
-        c_terminal_angle_diff = abs(c_terminal_angle - center_epitope_angle)
-
-        # Check if terminals are pointing away from the epitope
-        n_terminal_opposite = (180 - tolerance) <= n_terminal_angle <= (180 + tolerance)
-        c_terminal_opposite = (180 - tolerance) <= c_terminal_angle <= (180 + tolerance)
-
-        return {
-            'PDB': pdb_file,
-            'N_terminal_inside': 0 if n_terminal_inside else 1,
-            'C_terminal_inside': 0 if c_terminal_inside else 1,
-            'N_terminal_opposite': 1 if n_terminal_opposite else 0,
-            'C_terminal_opposite': 1 if c_terminal_opposite else 0,
-            'N_terminal_distance': n_terminal_distance,
-            'C_terminal_distance': c_terminal_distance,
-            'N_terminal_angle': n_terminal_angle,
-            'C_terminal_angle': c_terminal_angle,
-            'Center_epitope_angle': center_epitope_angle,
-            'N_terminal_angle_diff': n_terminal_angle_diff,
-            'C_terminal_angle_diff': c_terminal_angle_diff
-        }
-
-def main(pdb_directory, epitope, padding=20.0, tolerance=80.0, output_dir='output'):
+def main(pdb_directory, padding=20.0, tolerance=80.0, interaction_cutoff=5.0, output_dir='output'):
     results = []
     pdb_files = [f for f in os.listdir(pdb_directory) if f.endswith('.pdb')]
 
     for pdb_file in pdb_files:
         pdb_file_path = os.path.join(pdb_directory, pdb_file)
         print(f"Processing {pdb_file_path}...")
-        result = analyze_pdb(pdb_file_path, epitope, padding, tolerance)
+        result = analyze_pdb(pdb_file_path, padding, tolerance, interaction_cutoff)
         if result:
             results.append(result)
 
@@ -180,22 +165,21 @@ def main(pdb_directory, epitope, padding=20.0, tolerance=80.0, output_dir='outpu
     print(f"Filtered PDB files copied to {output_filtered_dir}")
     return filtered_pdb_files
 
-
 # Usage
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Analyze PDB files for epitope and terminal positions.")
+    parser = argparse.ArgumentParser(description="Analyze PDB files for interaction region and terminal positions.")
     parser.add_argument("-d", "--directory", required=True, help="Directory containing PDB files")
-    parser.add_argument("-e", "--epitope", required=True, help="Epitope sequence")
     parser.add_argument("-p", "--padding", type=float, default=20.0, help="Padding size in angstroms")
     parser.add_argument("-t", "--tolerance", type=float, default=80.0, help="Tolerance in degrees for opposite direction check")
+    parser.add_argument("-c", "--interaction_cutoff", type=float, default=5.0, help="Cutoff distance for interaction region in angstroms")
     parser.add_argument("-o", "--output", default='output', help="Output directory for results")
 
     args = parser.parse_args()
 
     pdb_directory = args.directory
-    epitope_sequence = args.epitope
     padding = args.padding
     tolerance = args.tolerance
+    interaction_cutoff = args.interaction_cutoff
     output_dir = args.output
 
-    main(pdb_directory, epitope_sequence, padding, tolerance, output_dir)
+    main(pdb_directory, padding, tolerance, interaction_cutoff, output_dir)
