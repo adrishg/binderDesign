@@ -9,7 +9,7 @@
 # Receives project_name, pdb_target, hotspots, ...
 
 project_name="testPipeline_Cav22_AID"
-project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test/"
+project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-Pipeline/"
 pdb_target="/share/yarovlab/ahgz/Binders/Test_Pipeline/inputs/7miy_truncated.pdb"
 hostpots=""
 #Receives
@@ -35,7 +35,7 @@ mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesi
 #sbatch --wait 1-run_backboneDesign.sh -o "$project_name" [-i INPUT_PDB] [-g CONTIGMAP] -n 100
 #Example Cav2.2_AID
 sbatch --wait 1-run_backboneDesign.sh \
-    "/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-1/output100/" \
+    "$project_path/1-BackboneDesign/output/" \
     "/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-1/inputs/7miy_truncated.pdb" \
     "[A332-406/0 A464-786/0 60-100]" \
     "[A381,A384,A385,A388,A389,A391,A392]" \
@@ -45,18 +45,18 @@ sbatch --wait 1-run_backboneDesign.sh \
 # In this case waits automatically
 # Filter 1: in this case to make the C and N terminus to be in the same side and far from the interacting region between A and B, padding and tolerance might need fine tuning
 
-#python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus.py -d /path/to/pdb_directory -p 10.0 -t 60.0
+python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus.py -d "$project_path/1-BackboneDesign/output/" -p 10.0 -t 60.0 -c 5.0 -o "$project_path/1.5-FilteringBackbones/output/"
 
 # More filters TBA
 
 # Step 2: Sequence Design with Soluble MPNN
 #Generate sequences with Soluble MPNN chain A is always binder in RFDiffusion
 
-#sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2-sequenceDesign_solubleMPNN_de_novo.sh -f "$project_path/1.5-FilteringBackbones/output/" -o "$project_path/2-SequenceDesign" -c 'A'
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2-sequenceDesign_solubleMPNN_de_novo.sh -f "$project_path/1.5-FilteringBackbones/output/" -o "$project_path/2-SequenceDesign" -c 'A'
 
 # Step 3: Foldability Test of binder only
 # Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
-#sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh -s "$project_path/2-SequenceDesign" -o "$project_path/3-FoldabilityTest/output/"
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh -s "$project_path/2-SequenceDesign" -o "$project_path/3-FoldabilityTest/output/"
 
 # Part 2: Foldability Test Filtering and Plotting
 # Run final Python script to generate plots and summary
