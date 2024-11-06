@@ -7,6 +7,9 @@
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END           # Mail at end of run
 
+source /share/yarovlab/ahgz/.bashrc
+conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
+module load gcc/13.2.0
 
 # Usage:
 usage() {
@@ -26,14 +29,6 @@ while getopts ":s:o:h" opt; do
     esac
 done
 
-# Update SLURM directives for email
-#SBATCH --mail-user=$EMAIL
-
-# Source your bashrc
-source /share/yarovlab/ahgz/.bashrc
-
-# Activate the conda environment
-conda activate "$CONDA_ENV_PATH"
 
 # Iterate over each FASTA file in the directory
 for fasta_file in "$SEQ_FOLDER"/*.fa; do

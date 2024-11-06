@@ -11,6 +11,7 @@
 project_name="testPipeline_Cav22_AID"
 project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-Pipeline/"
 pdb_target="/share/yarovlab/ahgz/Binders/Test_Pipeline/inputs/7miy_truncated.pdb"
+contig_map=""
 hostpots=""
 #Receives
 #project_name, pdb_target, hotspots, ...?
@@ -55,11 +56,11 @@ python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.p
 # Step 2: Sequence Design with Soluble MPNN
 #Generate sequences with Soluble MPNN chain A is always binder in RFDiffusion
 
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2-sequenceDesign_solubleMPNN_de_novo.sh -f "$project_path/1.5-FilteringBackbones/output/" -o "$project_path/2-SequenceDesign" -c 'A'
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" -o "$project_path/2-SequenceDesign" -c 'A'
 
 # Step 3: Foldability Test of binder only
 # Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh -s "$project_path/2-SequenceDesign" -o "$project_path/3-FoldabilityTest/output/"
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh -s "$project_path/2-SequenceDesign/seqs/" -o "$project_path/3-FoldabilityTest/output/"
 
 # Part 2: Foldability Test Filtering and Plotting
 # Run final Python script to generate plots and summary
