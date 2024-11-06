@@ -17,7 +17,8 @@ hostpots=""
 
 source /share/yarovlab/ahgz/.bashrc
 
-conda activate
+conda activate base
+module load gcc/13.2.0
 
 
 #Returns list of design sequences that work and scatter plot, should probably return csv file with the sequences and values
@@ -45,6 +46,8 @@ sbatch --wait 1-run_backboneDesign.sh \
 # In this case waits automatically
 # Filter 1: in this case to make the C and N terminus to be in the same side and far from the interacting region between A and B, padding and tolerance might need fine tuning
 
+#Adding activating base environment here since step 1 activates RFDiffusion environment that lacks pandas so error
+conda activate base
 python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus.py -d "$project_path/1-BackboneDesign/output/" -p 10.0 -t 60.0 -c 5.0 -o "$project_path/1.5-FilteringBackbones/output/"
 
 # More filters TBA

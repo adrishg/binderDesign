@@ -8,7 +8,7 @@ from itertools import combinations, product
 import shutil
 
 # Repurposed from epitope stabilization
-# Missing recognition of interaction region (polygly until these point)
+# Missing recognition of interaction region (alln polygly since it is not scaffolded until these point)
 
 def parse_pdb(filename):
     with open(filename, 'r') as file:
