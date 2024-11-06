@@ -198,4 +198,4 @@ if __name__ == "__main__":
     tolerance = args.tolerance
     output_dir = args.output
 
-    main(pdb_directory, epitope_sequence, 
+    main(pdb_directory, epitope_sequence, padding, tolerance, output_dir)
