@@ -4,7 +4,7 @@ import math
 import argparse
 import pandas as pd
 import numpy as np
-from itertools import groupby
+from itertools import groupby, count
 import shutil
 
 def parse_pdb(filename):
@@ -26,6 +26,7 @@ def get_residue_atoms(atoms):
         residues[(chain, res_num)] = (res_name, atom_name, x, y, z)
     return residues
 
+
 def find_interacting_region(residues, chain_a='A', chain_b='B', interaction_cutoff=5.0):
     interacting_residues = []
     chain_a_atoms = [(key, coords) for key, coords in residues.items() if key[0] == chain_a]
@@ -46,6 +47,7 @@ def find_interacting_region(residues, chain_a='A', chain_b='B', interaction_cuto
     groups = [list(group) for _, group in groupby(interacting_residues, key=lambda n, c=count(): n - next(c))]
     largest_region = max(groups, key=len)
     return largest_region
+
 
 def get_terminal_positions(residues, chain):
     chain_residues = sorted(num for ch, num in residues.keys() if ch == chain)

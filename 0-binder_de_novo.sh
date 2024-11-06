@@ -65,6 +65,4 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh
 # Run final Python script to generate plots and summary
 #Plot the results by pLDDT and RMSD, returns summary with list of design squences that have pLDDT > 95 and RMSD < 1.5 A and scatterplot png
 
-#python /share/yarovlab/ahgz/scripts/binderDesign/3-FoldabilityTest_plot_filter.py --folder_of_folders "$project_path/3-FoldabilityTest/output/" --reference_folder "$project_path/1-BackboneDesign/output" --output_csv "output.csv" --filtered_output_csv "filtered_output.csv" --summary_file "summary_foldabilityTest.txt" --plot_file "output_directory/pldds_vs_rmsd_plot.png" --plddt_threshold 95 --rmsd_threshold 2
-
-#Step 4: AF multimer and Docking(?) step
+#python /share/yarovlab/ahgz/scripts/binderDesign/3-FoldabilityTest_plot_filter.py --folder_of_folders "$project_path/3-FoldabilityTest/output/" --reference_folder "$project_path/1-BackboneDesign/output" --output_csv "output.csv" --filtered_output_csv "filtered_output.csv" --summary_file "s
