@@ -122,7 +122,7 @@ def analyze_pdb(pdb_file, padding, tolerance, interaction_cutoff):
         'C_terminal_angle_diff': c_terminal_angle_diff
     }
 
-def main(pdb_directory, padding=20.0, tolerance=80.0, interaction_cutoff=5.0, output_dir='output'):
+def main(pdb_directory, padding=20.0, tolerance=60.0, interaction_cutoff=5.0, output_dir='output'):
     results = []
     pdb_files = [f for f in os.listdir(pdb_directory) if f.endswith('.pdb')]
 
@@ -156,7 +156,7 @@ def main(pdb_directory, padding=20.0, tolerance=80.0, interaction_cutoff=5.0, ou
 
     print(f"Filtered results saved to {filtered_txt_path}")
 
-    output_filtered_dir = os.path.join(output_dir, "output_filtered")
+    output_filtered_dir = os.path.join(output_dir, "filtered_NCterminus")
     os.makedirs(output_filtered_dir, exist_ok=True)
 
     for pdb_file in filtered_pdb_files:

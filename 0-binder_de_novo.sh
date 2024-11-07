@@ -36,7 +36,7 @@ mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesi
 #Usage:
 #sbatch --wait 1-run_backboneDesign.sh -o "$project_name" [-i INPUT_PDB] [-g CONTIGMAP] -n 100
 #Example Cav2.2_AID
-sbatch --wait 1-run_backboneDesign.sh \
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/1-run_backboneDesign.sh \
     "$project_path/1-BackboneDesign/output/" \
     "/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-1/inputs/7miy_truncated.pdb" \
     "[A332-406/0 A464-786/0 60-100]" \

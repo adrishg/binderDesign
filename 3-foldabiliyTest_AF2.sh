@@ -11,7 +11,7 @@ source /share/yarovlab/ahgz/.bashrc
 conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
-# Usage:
+# Usage
 usage() {
     echo "Usage: $0 [-s SEQ_FOLDER] [-o OUTPUT_DIR_BASE] [-e CONDA_ENV_PATH] [-m EMAIL]"
     echo "  -s SEQ_FOLDER       Path to the folder containing FASTA files. Default is $SEQ_FOLDER."
@@ -29,18 +29,38 @@ while getopts ":s:o:h" opt; do
     esac
 done
 
-
-# Iterate over each FASTA file in the directory
+# Loop over each FASTA file in the directory
 for fasta_file in "$SEQ_FOLDER"/*.fa; do
-    # Get the base name of the FASTA file (without path and extension)
     base_name=$(basename "$fasta_file" .fa)
-
-    # Define the output directory using the base name
     output_dir="$OUTPUT_DIR_BASE/$base_name"
-
-    # Create the output directory if it doesn't exist
     mkdir -p "$output_dir"
 
-    # Run colabfold_batch on the current FASTA file
-    colabfold_batch --msa-mode single_sequence --num-recycle 5 --num-seed 3 "$fasta_file" "$output_dir"
+    # Create the reference CSV file
+    reference_csv="$output_dir/reference.csv"
+    echo "Alias,Original_Header" > "$reference_csv"
+
+    # Initialize sequence counter
+    seq_counter=1
+
+    # Read the FASTA file and process each header
+    temp_fasta="$output_dir/processed_$base_name.fa"
+    > "$temp_fasta"  # Empty the temp FASTA file
+
+    while read -r line; do
+        if [[ "$line" =~ ^\> ]]; then
+            # Original header line (starts with ">")
+            original_header=${line#>}  # Remove '>' from header
+            alias="something_${base_name}_${seq_counter}"
+            echo "$alias,$original_header" >> "$reference_csv"  # Save to reference CSV
+            echo ">$alias" >> "$temp_fasta"  # Write alias header to temp FASTA
+            ((seq_counter++))
+        else
+            # Sequence line
+            echo "$line" >> "$temp_fasta"
+        fi
+    done < "$fasta_file"
+
+    # Run colabfold_batch on the modified FASTA file
+    colabfold_batch --msa-mode single_sequence --num-recycle 5 --num-seed 3 "$temp_fasta" "$output_dir"
 done
+
