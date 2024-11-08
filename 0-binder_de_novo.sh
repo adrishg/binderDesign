@@ -83,12 +83,26 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_soluble
 # Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh \
     -s "$project_path/2-SequenceDesign/seqs/" \
+    -a "$project_name" \
     -o "$project_path/3-FoldabilityTest/output/"
 
 # Part 2: Foldability Test Filtering and Plotting
 # Run final Python script to generate plots and summary
 #Plot the results by pLDDT and RMSD, returns summary with list of design squences that have pLDDT > 95 and RMSD < 1.5 A and scatterplot png
+conda activate base
+
 
 #python /share/yarovlab/ahgz/scripts/binderDesign/3-FoldabilityTest_plot_filter.py --folder_of_folders "$project_path/3-FoldabilityTest/output/" --reference_folder "$project_path/1-BackboneDesign/output" --output_csv "output.csv" --filtered_output_csv "filtered_output.csv" --summary_file "summary_foldabilityTest.txt" --plot_file "output_directory/pldds_vs_rmsd_plot.png" --plddt_threshold 95 --rmsd_threshold 2
 
 #Step 4: AF multimer and Docking(?) step
+#Part 1: Actually executing multimer job
+#should we add -r for reference to only run multimer in those who passed the monomer foldability test?
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/4-multimerTest.sh\
+    -s "$project_path/2-SequenceDesign/seqs/" \
+    -o "$project_path/3-FoldabilityTest/output/"
+
+#Part 2: Different plot? since we cared about pae here?
+conda activate base
+
+
+

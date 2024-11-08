@@ -16,14 +16,16 @@ usage() {
     echo "Usage: $0 [-s SEQ_FOLDER] [-o OUTPUT_DIR_BASE] [-e CONDA_ENV_PATH] [-m EMAIL]"
     echo "  -s SEQ_FOLDER       Path to the folder containing FASTA files. Default is $SEQ_FOLDER."
     echo "  -o OUTPUT_DIR_BASE  Base output directory. Default is $OUTPUT_DIR_BASE."
+    echo "  -a ALIAS_PREFIX     Should be same with job name. Default is an empty string"
     exit 1
 }
 
 # Flags specification
-while getopts ":s:o:h" opt; do
+while getopts ":s:o:a:h" opt; do
     case ${opt} in
         s ) SEQ_FOLDER=$OPTARG ;;
         o ) OUTPUT_DIR_BASE=$OPTARG ;;
+        a ) ALIAS_PREFIX=$OPTARG ;;
         h ) usage ;;
         \? ) usage ;;
     esac
@@ -50,7 +52,7 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
         if [[ "$line" =~ ^\> ]]; then
             # Original header line (starts with ">")
             original_header=${line#>}  # Remove '>' from header
-            alias="something_${base_name}_${seq_counter}"
+            alias="$ALIAS_PREFIX_${base_name}_${seq_counter}"
             echo "$alias,$original_header" >> "$reference_csv"  # Save to reference CSV
             echo ">$alias" >> "$temp_fasta"  # Write alias header to temp FASTA
             ((seq_counter++))
