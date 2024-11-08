@@ -8,21 +8,21 @@
 
 # Receives project_name, pdb_target, hotspots, ...
 
+#Example Cav2.2_AID
 project_name="testPipeline_Cav22_AID"
 project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-Pipeline/"
-pdb_target="/share/yarovlab/ahgz/Binders/Test_Pipeline/inputs/7miy_truncated.pdb"
-contig_map=""
-hostpots=""
-#Receives
-#project_name, pdb_target, hotspots, ...?
+pdb_target="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-1/inputs/7miy_truncated.pdb"
+contig_map="[A332-406/0 A464-786/0 60-100]"
+hotspots="[A381,A384,A385,A388,A389,A391,A392]"
+number_models=100
 
 source /share/yarovlab/ahgz/.bashrc
-
 conda activate base
+
+#The latest gcc version in barbera:
 module load gcc/13.2.0
 
-
-#Returns list of design sequences that work and scatter plot, should probably return csv file with the sequences and values
+# Returns list of design sequences that work and scatter plot, should probably return csv file with the sequences and values
 
 # Set up project directory structure
 
@@ -35,21 +35,25 @@ mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesi
 
 #Usage:
 #sbatch --wait 1-run_backboneDesign.sh -o "$project_name" [-i INPUT_PDB] [-g CONTIGMAP] -n 100
-#Example Cav2.2_AID
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/1-run_backboneDesign.sh \
     "$project_path/1-BackboneDesign/output/" \
-    "/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-1/inputs/7miy_truncated.pdb" \
-    "[A332-406/0 A464-786/0 60-100]" \
-    "[A381,A384,A385,A388,A389,A391,A392]" \
-    100
+    "$pdb_target" \
+    "$contig_map" \
+    "$hotspots" \
+    $number_models \
 
 # Step 1.5: Filtering Backbones
 # In this case waits automatically
-# Filter 1: in this case to make the C and N terminus to be in the same side and far from the interacting region between A and B, padding and tolerance might need fine tuning
 
 #Adding activating base environment here since step 1 activates RFDiffusion environment that lacks pandas so error
 conda activate base
-python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.py -d "$project_path/1-BackboneDesign/output/" -p 10.0 -t 60.0 -c 5.0 -o "$project_path/1.5-FilteringBackbones/output/"
+
+# Filter 1: Radious of gyration (ROG) and also calculates "sphericality" but only filtering by ROG
+python /share/yarovlab/ahgz/scripts/binderDesign/1_6_filter_Compactness.py -d "$project_path/1-BackboneDesign/output/" -c A -o "$project_path/1.5-FilteringBackbones/output/" --rg_cutoff 15.0
+
+# Filter 2: in this case to make the C and N terminus to be in the same side and far from the interacting region between A and B, padding and tolerance might need fine tuning
+python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.py -d "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" -p 10.0 -t 60.0 -c 5.0 -o "$project_path/1.5-FilteringBackbones/output/"
+
 
 # More filters TBA
 
