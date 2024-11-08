@@ -120,11 +120,4 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default='output', help="Output directory for results")
     parser.add_argument("--rg_cutoff", type=float, default=15.0, help="Radius of Gyration cutoff for filtering (default: 15.0)")
 
-    args = parser.parse_args()
-
-    pdb_directory = args.directory
-    chain = args.chain
-    output_dir = args.output
-    rg_cutoff = args.rg_cutoff
-
-    main(pdb_directory, chain, output_dir, rg_cutoff)
+   

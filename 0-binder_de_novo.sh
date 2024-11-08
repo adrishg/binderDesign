@@ -18,6 +18,9 @@ contig_map="[A332-406/0 A464-786/0 60-100]"
 hotspots="[A381,A384,A385,A388,A389,A391,A392]"
 number_models=100
 
+#Default ROG
+rog_value=5
+
 source /share/yarovlab/ahgz/.bashrc
 conda activate base
 
@@ -43,6 +46,7 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/1-run_backboneDesign.sh 
     "$contig_map" \
     "$hotspots" \
     $number_models \
+    $rog_value \
 
 # Step 1.5: Filtering Backbones
 # In this case waits automatically
