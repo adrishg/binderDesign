@@ -49,22 +49,35 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/1-run_backboneDesign.sh 
 conda activate base
 
 # Filter 1: Radious of gyration (ROG) and also calculates "sphericality" but only filtering by ROG
-python /share/yarovlab/ahgz/scripts/binderDesign/1_6_filter_Compactness.py -d "$project_path/1-BackboneDesign/output/" -c A -o "$project_path/1.5-FilteringBackbones/output/" --rg_cutoff 15.0
+python /share/yarovlab/ahgz/scripts/binderDesign/1_6_filter_Compactness.py \
+    -d "$project_path/1-BackboneDesign/output/" \
+    -c A \
+    -o "$project_path/1.5-FilteringBackbones/output/" \
+    --rg_cutoff 15.0
 
 # Filter 2: in this case to make the C and N terminus to be in the same side and far from the interacting region between A and B, padding and tolerance might need fine tuning
-python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.py -d "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" -p 10.0 -t 60.0 -c 5.0 -o "$project_path/1.5-FilteringBackbones/output/"
-
+python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.py \
+    -d "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" \
+    -p 10.0 \
+    -t 60.0 \
+    -c 5.0 \
+    -o "$project_path/1.5-FilteringBackbones/output/"
 
 # More filters TBA
 
 # Step 2: Sequence Design with Soluble MPNN
 #Generate sequences with Soluble MPNN chain A is always binder in RFDiffusion
 
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" -o "$project_path/2-SequenceDesign" -c 'A'
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh \
+    -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" \
+    -o "$project_path/2-SequenceDesign" \
+    -c 'A'
 
 # Step 3: Foldability Test of binder only
 # Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh -s "$project_path/2-SequenceDesign/seqs/" -o "$project_path/3-FoldabilityTest/output/"
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh \
+    -s "$project_path/2-SequenceDesign/seqs/" \
+    -o "$project_path/3-FoldabilityTest/output/"
 
 # Part 2: Foldability Test Filtering and Plotting
 # Run final Python script to generate plots and summary
