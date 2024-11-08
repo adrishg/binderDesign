@@ -8,6 +8,8 @@
 
 # Receives project_name, pdb_target, hotspots, ...
 
+##Test username github jeje
+
 #Example Cav2.2_AID
 project_name="testPipeline_Cav22_AID"
 project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-Pipeline/"
