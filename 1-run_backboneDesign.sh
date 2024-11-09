@@ -17,7 +17,6 @@ input_pdb=$2
 contigmap=$3
 hotspot_res=$4
 num_designs=${5:-10}  # Default to 10 if not provided
-rog_value=$6
 
 # Run RFdiffusion script with parameters
 /share/yarovlab/ahgz/apps/RFdiffusion/scripts/run_inference.py \
@@ -28,5 +27,5 @@ rog_value=$6
     inference.num_designs="$num_designs" \
     denoiser.noise_scale_ca=0 \
     denoiser.noise_scale_frame=0 \
-    potentials=[monomer_ROG] potentials.monomer_ROG.weight="$rog_value" \
-
+    'potentials.guiding_potentials=["type:monomer_ROG,weight:1,min_dist:5"]' \
+    potentials.guide_scale=2 potentials.guide_decay="quadratic"
