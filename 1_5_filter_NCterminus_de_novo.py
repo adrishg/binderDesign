@@ -184,4 +184,4 @@ if __name__ == "__main__":
     interaction_cutoff = args.interaction_cutoff
     output_dir = args.output
 
-    main(pdb_directory, padding, tolerance, interaction_cutoff, output_dir)
+    main(pdb_directory, padding, tolerance, interaction_cutoff, output_d
