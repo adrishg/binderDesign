@@ -62,7 +62,6 @@ for pdb_file in $folder_with_pdbs/*.pdb; do
         --use_soluble_model \
         --jsonl_path $path_for_parsed_chains \
         --chain_id_jsonl $path_for_assigned_chains \
-        --fixed_positions_jsonl $path_for_assigned_chains \
         --out_folder $output_dir \
         --num_seq_per_target 25 \
         --sampling_temp "0.1" \
