@@ -13,10 +13,11 @@ source activate mlfold
 
 # Variables (default values)
 chains_to_design="A"
+chains_to_fix="B"
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-f folder_with_pdbs] [-o output_dir] [-c chains_to_design] [-e epitope_sequence]"
+    echo "Usage: $0 [-f folder_with_pdbs] [-o output_dir] [-c chains_to_design]"
     echo "  -f    Path to the folder containing PDB files (default: /share/yarovlab/ahgz/a2d4-nanobodies/1-RFdiff/epitopeTOP/Test-1/)"
     echo "  -o    Path to the output directory (default: /share/yarovlab/ahgz/a2d4-nanobodies/2-pMPNN/test0/output/)"
     echo "  -c    Chains to design (default: A)"
@@ -31,7 +32,6 @@ do
         f) folder_with_pdbs=${OPTARG};;
         o) output_dir=${OPTARG};;
         c) chains_to_design=${OPTARG};;
-        e) epitope_sequence=${OPTARG};;
         h) usage;;
         *) usage;;
     esac
@@ -44,32 +44,25 @@ fi
 
 path_for_parsed_chains=$output_dir"/parsed_pdbs.jsonl"
 path_for_assigned_chains=$output_dir"/assigned_pdbs.jsonl"
-path_for_fixed_positions=$output_dir"/fixed_pdbs.jsonl"
 
 # Parse multiple chains
 python /share/yarovlab/ahgz/apps/ProteinMPNN/helper_scripts/parse_multiple_chains.py --input_path=$folder_with_pdbs --output_path=$path_for_parsed_chains
 
-# Assign fixed chains
-python /share/yarovlab/ahgz/apps/ProteinMPNN/helper_scripts/assign_fixed_chains.py --input_path=$path_for_parsed_chains --output_path=$path_for_assigned_chains --chain_list "$chains_to_design"
+# Assign fixed chains for chain B
+python /share/yarovlab/ahgz/apps/ProteinMPNN/helper_scripts/assign_fixed_chains.py --input_path=$path_for_parsed_chains --output_path=$path_for_assigned_chains --chain_list "$chains_to_fix"
 
 # Iterate over each PDB file in the folder
 for pdb_file in $folder_with_pdbs/*.pdb; do
     echo "Processing $pdb_file"
 
-    # Calculate fixed positions for the current PDB file
-    fixed_positions=$(./share/yarovlab/ahgz/scripts/nanobodies/find_epitope_positions.sh $pdb_file $epitope_sequence | grep 'fixed_positions=' | cut -d '"' -f 2)
-
-    # Make fixed positions dictionary
-    python /share/yarovlab/ahgz/apps/ProteinMPNN/helper_scripts/make_fixed_positions_dict.py --input_path=$path_for_parsed_chains --output_path=$path_for_fixed_positions --chain_list "$chains_to_design" --position_list "$fixed_positions"
-
-    # Run the ProteinMPNN script
+    # Run the ProteinMPNN script with chain B fixed and chain A designed
     python /share/yarovlab/ahgz/apps/ProteinMPNN/protein_mpnn_run.py \
         --pdb_path $pdb_file \
         --pdb_path_chains $chains_to_design \
         --use_soluble_model \
         --jsonl_path $path_for_parsed_chains \
         --chain_id_jsonl $path_for_assigned_chains \
-        --fixed_positions_jsonl $path_for_fixed_positions \
+        --fixed_positions_jsonl $path_for_assigned_chains \
         --out_folder $output_dir \
         --num_seq_per_target 25 \
         --sampling_temp "0.1" \

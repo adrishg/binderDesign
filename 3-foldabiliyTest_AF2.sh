@@ -62,4 +62,7 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
         fi
     done < "$fasta_file"
 
-    # Run colabfold_batch on th
+    # Run colabfold_batch on the modified FASTA file
+    colabfold_batch --msa-mode single_sequence --num-recycle 5 --num-seed 3 "$temp_fasta" "$output_dir"
+done
+

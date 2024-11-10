@@ -26,4 +26,6 @@ num_designs=${5:-10}  # Default to 10 if not provided
     ppi.hotspot_res="$hotspot_res" \
     inference.num_designs="$num_designs" \
     denoiser.noise_scale_ca=0 \
-    denoiser.noise_scale_frame=0 
+    denoiser.noise_scale_frame=0 \
+    'potentials.guiding_potentials=["type:monomer_ROG,weight:1,min_dist:5"]' \
+    potentials.guide_scale=2 potentials.guide_decay="quadratic"
