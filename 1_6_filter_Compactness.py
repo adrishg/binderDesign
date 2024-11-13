@@ -83,6 +83,11 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
 def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=15.0):
     results = []
     pdb_files = [f for f in os.listdir(pdb_directory) if f.endswith('.pdb')]
+    
+    if not pdb_files:
+        print(f"No PDB files found in the directory: {os.path.abspath(pdb_directory)}")
+        return
+
     filtered_pdb_files = []
 
     for pdb_file in pdb_files:
