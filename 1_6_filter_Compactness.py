@@ -103,4 +103,43 @@ def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=15.0):
         result = calculate_compactness_metrics(pdb_file_path, chain=chain)
         if result:
             results.append(result)
-            if result['Radius_of_Gyration'] <= rg_cutoff
+            if result['Radius_of_Gyration'] <= rg_cutoff:
+                filtered_pdb_files.append(pdb_file)
+
+
+    # Save results to CSV
+    results_df = pd.DataFrame(results)
+    os.makedirs(output_dir, exist_ok=True)
+    results_csv_path = os.path.join(output_dir, "compactness_results.csv")
+    results_df.to_csv(results_csv_path, index=False)
+    print("Results saved to {}".format(results_csv_path))
+
+    # Move filtered PDB files to output/filtered_compactness
+    filtered_dir = os.path.join(output_dir, "filtered_compactness")
+    os.makedirs(filtered_dir, exist_ok=True)
+
+    for pdb_file in filtered_pdb_files:
+        src_path = os.path.join(pdb_directory, pdb_file)
+        dst_path = os.path.join(filtered_dir, pdb_file)
+        shutil.copy(src_path, dst_path)
+
+    print("Filtered PDB files copied to {}".format(filtered_dir))
+
+# Usage
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Filter PDB files based on compactness using Radius of Gyration.")
+    parser.add_argument("-d", "--directory", required=True, help="Directory containing PDB files")
+    parser.add_argument("-c", "--chain", default='A', help="Chain identifier to analyze (default: A)")
+    parser.add_argument("-o", "--output", default='output', help="Output directory for results")
+    parser.add_argument("--rg_cutoff", type=float, default=15.0, help="Radius of Gyration cutoff for filtering (default: 15.0)")
+    args = parser.parse_args()
+
+    pdb_directory = args.directory
+
+    chain = args.chain
+    output_dir = args.output
+    rg_cutoff = args.rg_cutoff
+
+    main(pdb_directory, chain, output_dir, rg_cutoff)
