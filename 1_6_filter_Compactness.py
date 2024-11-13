@@ -58,27 +58,35 @@ def calculate_sphericity(volume, surface_area):
     return (math.pi ** (1/3) * (6 * volume) ** (2/3)) / surface_area
 
 def calculate_compactness_metrics(pdb_file, chain='A'):
-    atoms = parse_pdb(pdb_file)
-    residues = get_residue_atoms(atoms, chain=chain)
-    if not residues:
-        print("No residues found for chain {} in {}.".format(chain, pdb_file))
-        return None
+    try:
+        atoms = parse_pdb(pdb_file)
+        residues = get_residue_atoms(atoms, chain=chain)
+        
+        # Raise an exception if no residues are found
+        if not residues:
+            raise ValueError("No residues found for chain {} in {}.".format(chain, pdb_file))
 
-    mass_center = calculate_mass_center(residues)
-    rg = calculate_radius_of_gyration(residues, mass_center)
-    volume = calculate_volume(residues)
-    surface_area = calculate_surface_area(pdb_file)
-    sphericity = calculate_sphericity(volume, surface_area)
+        mass_center = calculate_mass_center(residues)
+        rg = calculate_radius_of_gyration(residues, mass_center)
+        volume = calculate_volume(residues)
+        surface_area = calculate_surface_area(pdb_file)
+        sphericity = calculate_sphericity(volume, surface_area)
 
-    return {
-        'PDB': pdb_file,
-        'Chain': chain,
-        'Mass_Center': mass_center,
-        'Radius_of_Gyration': rg,
-        'Volume': volume,
-        'Surface_Area': surface_area,
-        'Sphericity': sphericity
-    }
+        return {
+            'PDB': pdb_file,
+            'Chain': chain,
+            'Mass_Center': mass_center,
+            'Radius_of_Gyration': rg,
+            'Volume': volume,
+            'Surface_Area': surface_area,
+            'Sphericity': sphericity
+        }
+    
+    except ValueError as e:
+        # Print error message and skip the file
+        print(e)
+        return
+
 
 def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=15.0):
     results = []
