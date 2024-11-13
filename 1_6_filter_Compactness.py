@@ -53,10 +53,10 @@ def calculate_volume(residues):
 #    result = freesasa.calc(structure)
 #    return result.totalArea()
 
-def calculate_sphericity(volume, surface_area):
-    if surface_area == 0:
-        return 0
-    return (math.pi ** (1/3) * (6 * volume) ** (2/3)) / surface_area
+#def calculate_sphericity(volume, surface_area):
+#    if surface_area == 0:
+#        return 0
+#    return (math.pi ** (1/3) * (6 * volume) ** (2/3)) / surface_area
 
 def calculate_compactness_metrics(pdb_file, chain='A'):
     try:
@@ -71,7 +71,7 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
         rg = calculate_radius_of_gyration(residues, mass_center)
         volume = calculate_volume(residues)
         #surface_area = calculate_surface_area(pdb_file)
-        sphericity = calculate_sphericity(volume, surface_area)
+        #sphericity = calculate_sphericity(volume, surface_area)
 
         return {
             'PDB': pdb_file,
@@ -80,7 +80,7 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
             'Radius_of_Gyration': rg,
             'Volume': volume,
             #'Surface_Area': surface_area,
-            'Sphericity': sphericity
+            #'Sphericity': sphericity
         }
 
     except ValueError as e:
