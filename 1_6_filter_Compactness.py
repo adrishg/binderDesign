@@ -4,7 +4,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import shutil
-import freesasa
+#import freesasa
 from scipy.spatial import ConvexHull
 
 def parse_pdb(filename):
@@ -47,10 +47,11 @@ def calculate_volume(residues):
     hull = ConvexHull(coords)
     return hull.volume
 
-def calculate_surface_area(pdb_file):
-    structure = freesasa.Structure(pdb_file)
-    result = freesasa.calc(structure)
-    return result.totalArea()
+#Surface area works in personal computer, but in barbera so far i will need to create new environment to run this part, for now commenting
+#def calculate_surface_area(pdb_file):
+#    structure = freesasa.Structure(pdb_file)
+#    result = freesasa.calc(structure)
+#    return result.totalArea()
 
 def calculate_sphericity(volume, surface_area):
     if surface_area == 0:
@@ -69,7 +70,7 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
         mass_center = calculate_mass_center(residues)
         rg = calculate_radius_of_gyration(residues, mass_center)
         volume = calculate_volume(residues)
-        surface_area = calculate_surface_area(pdb_file)
+        #surface_area = calculate_surface_area(pdb_file)
         sphericity = calculate_sphericity(volume, surface_area)
 
         return {
@@ -78,7 +79,7 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
             'Mass_Center': mass_center,
             'Radius_of_Gyration': rg,
             'Volume': volume,
-            'Surface_Area': surface_area,
+            #'Surface_Area': surface_area,
             'Sphericity': sphericity
         }
 
