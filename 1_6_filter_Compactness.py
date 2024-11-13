@@ -61,7 +61,7 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
     atoms = parse_pdb(pdb_file)
     residues = get_residue_atoms(atoms, chain=chain)
     if not residues:
-        print(f"No residues found for chain {chain} in {pdb_file}.")
+        print("No residues found for chain {} in {}.".format(chain, pdb_file))
         return None
 
     mass_center = calculate_mass_center(residues)
