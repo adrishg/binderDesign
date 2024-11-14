@@ -27,5 +27,5 @@ num_designs=${5:-10}  # Default to 10 if not provided
     inference.num_designs="$num_designs" \
     denoiser.noise_scale_ca=0 \
     denoiser.noise_scale_frame=0 \
-    'potentials.guiding_potentials=["type:monomer_ROG,weight:1,min_dist:5"]' \
+   'potentials.guiding_potentials=["type:binder_ROG,weight:100,min_dist:10"]' \
     potentials.guide_scale=2 potentials.guide_decay="quadratic"
