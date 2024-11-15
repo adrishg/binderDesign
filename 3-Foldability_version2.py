@@ -13,14 +13,14 @@ three_to_one = {
     'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
 }
 
-def parse_pdb(file_path):
+def parse_pdb(file_path, chain='A'):
     alpha_carbons = []
     plddts = []
     sequence = []
 
     with open(file_path, 'r') as file:
         for line in file:
-            if line.startswith('ATOM') and line[13:15].strip() == 'CA':
+            if line.startswith('ATOM') and line[13:15].strip() == 'CA' and line[21] == chain:
                 res_name = line[17:20].strip()
                 x = float(line[30:38].strip())
                 y = float(line[38:46].strip())
@@ -31,8 +31,9 @@ def parse_pdb(file_path):
                 sequence.append(three_to_one.get(res_name, 'X'))
 
     # Debugging outputs
-    print(f"File: {file_path}, Sequence Length: {len(sequence)}, pLDDTs: {plddts[:10]}")
+    print(f"File: {file_path}, Chain: {chain}, Sequence Length: {len(sequence)}, pLDDTs: {plddts[:10]}")
     return np.array(alpha_carbons), plddts, ''.join(sequence)
+
 
 def superpose_and_calculate_rmsd(coords1, coords2):
     assert coords1.shape == coords2.shape, "Coordinate arrays must have the same shape"
@@ -65,9 +66,9 @@ def process_pdb_files(folder_of_folders, reference_folder):
             ref_pdb_name = folder_name + ".pdb"
             ref_pdb_path = os.path.join(reference_folder, ref_pdb_name)
 
-            # Parse the reference structure
+            # Parse the reference structure (chain A only)
             try:
-                ref_alpha_carbons, _, _ = parse_pdb(ref_pdb_path)
+                ref_alpha_carbons, _, _ = parse_pdb(ref_pdb_path, chain='A')
             except FileNotFoundError:
                 print(f"Reference file not found: {ref_pdb_path}")
                 continue
@@ -77,7 +78,7 @@ def process_pdb_files(folder_of_folders, reference_folder):
                     if file.endswith(".pdb") and "rank_001" in file:
                         pdb_path = os.path.join(subroot, file)
                         try:
-                            alpha_carbons, plddts, sequence = parse_pdb(pdb_path)
+                            alpha_carbons, plddts, sequence = parse_pdb(pdb_path, chain='A')
                         except Exception as e:
                             print(f"Error parsing {pdb_path}: {e}")
                             continue
