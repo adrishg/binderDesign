@@ -25,41 +25,34 @@ def parse_pdb(file_path):
                 x = float(line[30:38].strip())
                 y = float(line[38:46].strip())
                 z = float(line[46:54].strip())
-                b_factor = float(line[60:66].strip())
+                b_factor = float(line[60:66].strip())  # Extract B-factor
                 alpha_carbons.append((x, y, z))
                 plddts.append(b_factor)
                 sequence.append(three_to_one.get(res_name, 'X'))
-    
+
+    # Debugging outputs
+    print(f"File: {file_path}, Sequence Length: {len(sequence)}, pLDDTs: {plddts[:10]}")
     return np.array(alpha_carbons), plddts, ''.join(sequence)
 
 def superpose_and_calculate_rmsd(coords1, coords2):
     assert coords1.shape == coords2.shape, "Coordinate arrays must have the same shape"
 
-    # Center the coordinates
     coords1_centered = coords1 - np.mean(coords1, axis=0)
     coords2_centered = coords2 - np.mean(coords2, axis=0)
 
-    # Calculate the covariance matrix
     covariance_matrix = np.dot(coords1_centered.T, coords2_centered)
-
-    # Singular Value Decomposition (SVD)
     V, S, Wt = np.linalg.svd(covariance_matrix)
 
-    # Calculate the optimal rotation matrix
     d = (np.linalg.det(V) * np.linalg.det(Wt)) < 0.0
     if d:
         S[-1] = -S[-1]
         V[:, -1] = -V[:, -1]
 
     rotation_matrix = np.dot(V, Wt)
-
-    # Rotate the second set of coordinates
     coords2_rotated = np.dot(coords2_centered, rotation_matrix)
 
-    # Calculate the RMSD
     diff = coords1_centered - coords2_rotated
     rmsd = np.sqrt((diff ** 2).sum() / len(coords1))
-
     return rmsd
 
 def process_pdb_files(folder_of_folders, reference_folder):
@@ -71,14 +64,23 @@ def process_pdb_files(folder_of_folders, reference_folder):
             folder_name = dir.split('.')[0]
             ref_pdb_name = folder_name + ".pdb"
             ref_pdb_path = os.path.join(reference_folder, ref_pdb_name)
-            
-            ref_alpha_carbons, _, _ = parse_pdb(ref_pdb_path)
-            
+
+            # Parse the reference structure
+            try:
+                ref_alpha_carbons, _, _ = parse_pdb(ref_pdb_path)
+            except FileNotFoundError:
+                print(f"Reference file not found: {ref_pdb_path}")
+                continue
+
             for subroot, subdirs, subfiles in os.walk(dir_path):
                 for file in subfiles:
                     if file.endswith(".pdb") and "rank_001" in file:
                         pdb_path = os.path.join(subroot, file)
-                        alpha_carbons, plddts, sequence = parse_pdb(pdb_path)
+                        try:
+                            alpha_carbons, plddts, sequence = parse_pdb(pdb_path)
+                        except Exception as e:
+                            print(f"Error parsing {pdb_path}: {e}")
+                            continue
 
                         if len(ref_alpha_carbons) == len(alpha_carbons):
                             if 'G' * 15 in sequence:
@@ -91,8 +93,10 @@ def process_pdb_files(folder_of_folders, reference_folder):
                                 'plddt': sum(plddts) / len(plddts),
                                 'rmsd': rmsd
                             })
-    
+
     df = pd.DataFrame(data)
+    print("Processed dataframe:")
+    print(df.head())
     return df
 
 def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
@@ -122,16 +126,13 @@ def main(args):
     for filename in filtered_df['file_name']:
         summary.append(filename)
 
-    # Plotting RMSD against overall alpha carbon pLDDT with color coding by folder
     if not df.empty:
         plt.figure(figsize=(10, 6))
-
-        # Generate unique colors for each folder using the tab20 colormap
         folders = df['folder_name'].unique()
         num_colors_needed = len(folders)
         colors = plt.cm.tab20(np.linspace(0, 1, num_colors_needed))
         folder_color_map = {folder: colors[i] for i, folder in enumerate(folders)}
-        
+
         for folder, color in folder_color_map.items():
             folder_data = df[df['folder_name'] == folder]
             plt.scatter(folder_data['rmsd'], folder_data['plddt'], label=folder, color=color, alpha=0.7)
@@ -141,24 +142,11 @@ def main(args):
         plt.title('RMSD vs. Overall Alpha Carbon pLDDT')
         plt.xlabel('RMSD')
         plt.ylabel('pLDDT')
-        
-        # Legend for thresholds inside the plot
-        threshold_legend = plt.legend(loc='upper right')
-        plt.gca().add_artist(threshold_legend)
-
-        # Separate legend for folder colors outside the plot
-        handles, labels = [], []
-        for folder, color in folder_color_map.items():
-            handles.append(Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10, label=folder))
-            labels.append(folder)
-        folder_legend = plt.legend(handles=handles, bbox_to_anchor=(1.05, 1), loc='upper left', title="Folder")
-        plt.gca().add_artist(folder_legend)
-        
+        plt.legend(loc='upper right')
         plt.grid(True)
         plt.savefig(args.plot_file, bbox_inches='tight')
         summary.append("Plot saved to " + args.plot_file)
 
-    # Save the summary to a text file
     with open(args.summary_file, 'w') as f:
         for line in summary:
             f.write(line + '\n')
