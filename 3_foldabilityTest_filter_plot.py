@@ -34,7 +34,6 @@ def parse_pdb(file_path, chain='A'):
     print(f"File: {file_path}, Chain: {chain}, Sequence Length: {len(sequence)}, pLDDTs: {plddts[:10]}")
     return np.array(alpha_carbons), plddts, ''.join(sequence)
 
-
 def superpose_and_calculate_rmsd(coords1, coords2):
     assert coords1.shape == coords2.shape, "Coordinate arrays must have the same shape"
 
@@ -56,15 +55,15 @@ def superpose_and_calculate_rmsd(coords1, coords2):
     rmsd = np.sqrt((diff ** 2).sum() / len(coords1))
     return rmsd
 
-def process_pdb_files(folder_of_folders, reference_folder):
+def process_pdb_files(af_models, rfdiff_backbones):
     data = []
 
-    for root, dirs, files in os.walk(folder_of_folders):
+    for root, dirs, files in os.walk(af_models):
         for dir in dirs:
             dir_path = os.path.join(root, dir)
             folder_name = dir.split('.')[0]
             ref_pdb_name = folder_name + ".pdb"
-            ref_pdb_path = os.path.join(reference_folder, ref_pdb_name)
+            ref_pdb_path = os.path.join(rfdiff_backbones, ref_pdb_name)
 
             # Parse the reference structure (chain A only)
             try:
@@ -105,7 +104,7 @@ def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
     return filtered_df
 
 def main(args):
-    df = process_pdb_files(args.folder_of_folders, args.reference_folder)
+    df = process_pdb_files(args.af_models, args.rfdiff_backbones)
 
     summary = []
 
@@ -156,8 +155,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process PDB files and generate summaries and plots.')
-    parser.add_argument('--folder_of_folders', type=str, required=True, help='Path to the folder containing subfolders with PDB files.')
-    parser.add_argument('--reference_folder', type=str, required=True, help='Path to the reference PDB files folder.')
+    parser.add_argument('--af-models', type=str, required=True, help='Folder containing subfolders with AlphaFold2 predictions.')
+    parser.add_argument('--rfdiff-backbones', type=str, required=True, help='Folder containing backbone models of RFDiffusion.')
     parser.add_argument('--output_csv', type=str, default='output.csv', help='Path to save the output CSV file.')
     parser.add_argument('--filtered_output_csv', type=str, default='filtered_output.csv', help='Path to save the filtered output CSV file.')
     parser.add_argument('--summary_file', type=str, default='summary_foldabilityTest.txt', help='Path to save the summary file.')
