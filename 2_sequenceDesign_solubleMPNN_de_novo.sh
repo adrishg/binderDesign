@@ -59,7 +59,6 @@ for pdb_file in $folder_with_pdbs/*.pdb; do
     python /share/yarovlab/ahgz/apps/ProteinMPNN/protein_mpnn_run.py \
         --pdb_path $pdb_file \
         --pdb_path_chains $chains_to_design \
-        --use_soluble_model \
         --jsonl_path $path_for_parsed_chains \
         --chain_id_jsonl $path_for_assigned_chains \
         --out_folder $output_dir \
