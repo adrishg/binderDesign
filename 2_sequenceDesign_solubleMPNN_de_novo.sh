@@ -62,7 +62,7 @@ for pdb_file in $folder_with_pdbs/*.pdb; do
         --jsonl_path $path_for_parsed_chains \
         --chain_id_jsonl $path_for_assigned_chains \
         --out_folder $output_dir \
-        --num_seq_per_target 25 \
+        --num_seq_per_target 50 \
         --sampling_temp "0.1" \
         --seed 37 \
         --batch_size 1
