@@ -61,7 +61,6 @@ for pdb_file in $folder_with_pdbs/*.pdb; do
         --pdb_path $pdb_file \
         --out_folder $output_dir \
         --chains_to_design $chains_to_design \
-        --num_seq_per_target 50 \
         --sampling_temp "0.1" \
         --omit_AA "C" \
         --batch_size 30
