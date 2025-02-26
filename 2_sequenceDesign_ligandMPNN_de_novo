@@ -1,0 +1,8 @@
+python run.py \
+        --model_type "ligand_mpnn" \
+        --seed 111 \
+        --pdb_path "./inputs/1BC8.pdb" \
+        --out_folder "./outputs/sc_default_fast" \
+        --pack_side_chains 1 \
+        --number_of_packs_per_design 0 \
+        --pack_with_ligand_context 1
