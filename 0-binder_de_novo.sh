@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -p gpu-vladimir           # Partition name
-#SBATCH -t 10-12:00:00            # 10 days 12 hours just in case
+#SBATCH -t 20-12:00:00            # 20 days 12 hours just in case
 #SBATCH --job-name=binder # Job name
-#SBATCH --mem=160G
+#SBATCH --mem=32G ####testing lowering cpu mem here (needed for filtering steps that run here and not as separate job)
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END           # Mail at end of run
 
@@ -18,7 +18,7 @@ contig_map="[A332-406/0 A464-786/0 60-100]"
 hotspots="[A381,A384,A385,A388,A389,A391,A392]"
 number_models=100
 
-#Default ROG
+#Default ROG for potentials RFDiff
 rog_value=5
 
 source /share/yarovlab/ahgz/.bashrc
@@ -74,14 +74,21 @@ python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.p
 # Step 2: Sequence Design with Soluble MPNN
 #Generate sequences with Soluble MPNN chain A is always binder in RFDiffusion
 
+##### this part was with proteinMPNN swichting to ligandMPNN...
+#sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh \
+#    -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" \
+#    -o "$project_path/2-SequenceDesign" \
+#    -c 'A'
+############## end of protein MPNN version
+
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh \
-    -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" \
-    -o "$project_path/2-SequenceDesign" \
-    -c 'A'
+#    -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" \
+#    -o "$project_path/2-SequenceDesign" \
+#    -c 'A'
 
 # Step 3: Foldability Test of binder only
 # Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh \
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2.sh \
     -s "$project_path/2-SequenceDesign/seqs/" \
     -a "$project_name" \
     -o "$project_path/3-FoldabilityTest/output/"
@@ -92,17 +99,18 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3-run_FoldabilityTest.sh
 conda activate base
 
 
+#Step 3.5: Filtering by solubility here before going to AFmultimer
+
 #python /share/yarovlab/ahgz/scripts/binderDesign/3-FoldabilityTest_plot_filter.py --folder_of_folders "$project_path/3-FoldabilityTest/output/" --reference_folder "$project_path/1-BackboneDesign/output" --output_csv "output.csv" --filtered_output_csv "filtered_output.csv" --summary_file "summary_foldabilityTest.txt" --plot_file "output_directory/pldds_vs_rmsd_plot.png" --plddt_threshold 95 --rmsd_threshold 2
 
 #Step 4: AF multimer and Docking(?) step
 #Part 1: Actually executing multimer job
 #should we add -r for reference to only run multimer in those who passed the monomer foldability test?
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/4-multimerTest.sh\
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/4_multimerTest.sh \
     -s "$project_path/2-SequenceDesign/seqs/" \
     -o "$project_path/3-FoldabilityTest/output/"
 
 #Part 2: Different plot? since we cared about pae here?
 conda activate base
-
 
 
