@@ -82,8 +82,8 @@ python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.p
 ############## end of protein MPNN version
 
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh \
-#    -f "$project_path/1.5-FilteringBackbones/output/output_filtered/" \
-#    -o "$project_path/2-SequenceDesign" \
+#    -f "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" \
+#    -o "$project_path/2-SequenceDesign/" \
 #    -c 'A'
 
 # Step 3: Foldability Test of binder only

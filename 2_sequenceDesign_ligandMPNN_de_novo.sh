@@ -42,15 +42,6 @@ if [ ! -d $output_dir ]; then
     mkdir -p $output_dir
 fi
 
-path_for_parsed_chains=$output_dir"/parsed_pdbs.jsonl"
-path_for_assigned_chains=$output_dir"/assigned_pdbs.jsonl"
-
-# Parse multiple chains
-python /share/yarovlab/ahgz/apps/ProteinMPNN/helper_scripts/parse_multiple_chains.py --input_path=$folder_with_pdbs --output_path=$path_for_parsed_chains
-
-# Assign fixed chains for chain B
-python /share/yarovlab/ahgz/apps/ProteinMPNN/helper_scripts/assign_fixed_chains.py --input_path=$path_for_parsed_chains --output_path=$path_for_assigned_chains --chain_list "$chains_to_fix"
-
 # Iterate over each PDB file in the folder
 for pdb_file in $folder_with_pdbs/*.pdb; do
     echo "Processing $pdb_file"
