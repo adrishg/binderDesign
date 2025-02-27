@@ -48,7 +48,7 @@ for pdb_file in $folder_with_pdbs/*.pdb; do
 
     # Run the ProteinMPNN script with chain B fixed and chain A designed
     python /share/yarovlab/ahgz/apps/LigandMPNN/run.py \
-        --checkpoint_ligand_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
+        --checkpoint_soluble_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
         --model_type "soluble_mpnn" \
         --pdb_path $pdb_file \
         --out_folder $output_dir \
