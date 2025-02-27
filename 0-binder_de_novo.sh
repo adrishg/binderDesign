@@ -81,7 +81,8 @@ python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.p
 #    -c 'A'
 ############## end of protein MPNN version
 
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_solubleMPNN_de_novo.sh \
+# Step 2 v2: Sequence Design with Ligand MPNN
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_ligandMPNN_de_novo.sh \
 #    -f "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" \
 #    -o "$project_path/2-SequenceDesign/" \
 #    -c 'A'
