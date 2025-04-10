@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:1        # Request 1 GPUs
 #SBATCH -t 1-12:00:00       # 1 day just in case
 #SBATCH --job-name=seqDesign # Job name
-#SBATCH --mem=80G
+#SBATCH --mem=125G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END # Mail at end of run
 
