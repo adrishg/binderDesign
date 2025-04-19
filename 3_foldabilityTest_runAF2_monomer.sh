@@ -11,7 +11,7 @@ source /share/yarovlab/ahgz/.bashrc
 conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
-# Usage
+# Usage message
 usage() {
     echo "Usage: $0 [-s SEQ_FOLDER] [-o OUTPUT_DIR_BASE] [-a ALIAS_PREFIX]"
     echo "  -s SEQ_FOLDER       Path to the folder containing FASTA files"
@@ -31,19 +31,19 @@ while getopts ":s:o:a:h" opt; do
     esac
 done
 
-# Ensure required args
+# Validate input
 if [[ -z "$SEQ_FOLDER" || -z "$OUTPUT_DIR_BASE" || -z "$ALIAS_PREFIX" ]]; then
     usage
 fi
 
-# Loop over each FASTA file in the directory
+# Process each FASTA file in the folder
 for fasta_file in "$SEQ_FOLDER"/*.fa; do
     base_name=$(basename "$fasta_file" .fa)
     output_dir="$OUTPUT_DIR_BASE/$base_name"
     mkdir -p "$output_dir"
 
     reference_csv="$output_dir/reference.csv"
-    processed_fasta="$output_dir/processed_$base_name.fa"
+    processed_fasta="$output_dir/processed_${base_name}.fa"
 
     echo "Alias,Original_Header,Truncated_Sequence" > "$reference_csv"
     > "$processed_fasta"
@@ -57,8 +57,13 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
         if [[ "$line" =~ ^\> ]]; then
             if [[ -n "$current_seq" && -n "$current_alias" ]]; then
                 truncated_seq="${current_seq%%:*}"
-                echo "$truncated_seq" >> "$processed_fasta"
-                echo "$current_alias,\"$original_header\",$truncated_seq" >> "$reference_csv"
+                if [[ "$truncated_seq" =~ ^G+$ ]]; then
+                    echo "Skipping all-Glycine sequence for $current_alias"
+                    ((seq_counter--))  # undo alias increment
+                else
+                    echo "$truncated_seq" >> "$processed_fasta"
+                    echo "$current_alias,\"$original_header\",$truncated_seq" >> "$reference_csv"
+                fi
             fi
             original_header=${line#>}
             current_alias="${ALIAS_PREFIX}_${base_name}_${seq_counter}"
@@ -70,11 +75,15 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
         fi
     done < "$fasta_file"
 
-    # Write the last sequence
+    # Final sequence
     if [[ -n "$current_seq" && -n "$current_alias" ]]; then
         truncated_seq="${current_seq%%:*}"
-        echo "$truncated_seq" >> "$processed_fasta"
-        echo "$current_alias,\"$original_header\",$truncated_seq" >> "$reference_csv"
+        if [[ "$truncated_seq" =~ ^G+$ ]]; then
+            echo "Skipping all-Glycine sequence for $current_alias"
+        else
+            echo "$truncated_seq" >> "$processed_fasta"
+            echo "$current_alias,\"$original_header\",$truncated_seq" >> "$reference_csv"
+        fi
     fi
 
     # Run ColabFold
