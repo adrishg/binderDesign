@@ -1,15 +1,93 @@
 import os
-import shutil
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
+import argparse
+import shutil
+
+# Dictionary to map three-letter amino acid codes to one-letter codes
+three_to_one = {
+    'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
+    'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
+    'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
+    'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
+}
+
+def parse_pdb(file_path, chain='A'):
+    alpha_carbons = []
+    plddts = []
+    sequence = []
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            if line.startswith('ATOM') and line[13:15].strip() == 'CA' and line[21] == chain:
+                res_name = line[17:20].strip()
+                x = float(line[30:38].strip())
+                y = float(line[38:46].strip())
+                z = float(line[46:54].strip())
+                b_factor = float(line[60:66].strip())
+                alpha_carbons.append((x, y, z))
+                plddts.append(b_factor)
+                sequence.append(three_to_one.get(res_name, 'X'))
+
+    return np.array(alpha_carbons), plddts, ''.join(sequence)
+
+def superpose_and_calculate_rmsd(coords1, coords2):
+    assert coords1.shape == coords2.shape, "Coordinate arrays must have the same shape"
+    coords1_centered = coords1 - np.mean(coords1, axis=0)
+    coords2_centered = coords2 - np.mean(coords2, axis=0)
+    covariance_matrix = np.dot(coords1_centered.T, coords2_centered)
+    V, S, Wt = np.linalg.svd(covariance_matrix)
+
+    if (np.linalg.det(V) * np.linalg.det(Wt)) < 0.0:
+        V[:, -1] = -V[:, -1]
+
+    rotation_matrix = np.dot(V, Wt)
+    coords2_rotated = np.dot(coords2_centered, rotation_matrix)
+    diff = coords1_centered - coords2_rotated
+    rmsd = np.sqrt((diff ** 2).sum() / len(coords1))
+    return rmsd
+
+def process_pdb_files(af_models, rfdiff_backbones):
+    data = []
+    for root, dirs, files in os.walk(af_models):
+        for dir in dirs:
+            dir_path = os.path.join(root, dir)
+            folder_name = dir.split('.')[0]
+            ref_pdb_path = os.path.join(rfdiff_backbones, f"{folder_name}.pdb")
+
+            try:
+                ref_alpha_carbons, _, _ = parse_pdb(ref_pdb_path, chain='A')
+            except FileNotFoundError:
+                print(f"Missing ref: {ref_pdb_path}")
+                continue
+
+            for subroot, _, subfiles in os.walk(dir_path):
+                for file in subfiles:
+                    if file.endswith(".pdb") and "rank_001" in file:
+                        pdb_path = os.path.join(subroot, file)
+                        try:
+                            alpha_carbons, plddts, sequence = parse_pdb(pdb_path)
+                        except Exception as e:
+                            print(f"Failed to parse {pdb_path}: {e}")
+                            continue
+                        if len(ref_alpha_carbons) == len(alpha_carbons) and 'G' * 15 not in sequence:
+                            rmsd = superpose_and_calculate_rmsd(ref_alpha_carbons, alpha_carbons)
+                            data.append({
+                                'folder_name': folder_name,
+                                'file_name': file,
+                                'sequence': sequence,
+                                'plddt': sum(plddts) / len(plddts),
+                                'rmsd': rmsd
+                            })
+    df = pd.DataFrame(data)
+    print("Processed dataframe with", len(df), "entries.")
+    return df
+
+def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
+    return df[(df['plddt'] > plddt_threshold) & (df['rmsd'] < rmsd_threshold)]
 
 def create_fasta_from_filtered_df(filtered_df, base_dir):
-    """
-    Creates:
-    - One combined FASTA file
-    - One FASTA per model folder
-    """
     seq_dir = os.path.join(base_dir, 'sequences')
     os.makedirs(seq_dir, exist_ok=True)
 
@@ -22,31 +100,17 @@ def create_fasta_from_filtered_df(filtered_df, base_dir):
                 header = f">{folder}_rank001"
                 fasta_all.write(f"{header}\n{seq}\n")
 
-                # Write individual FASTA per folder
                 folder_fasta = os.path.join(seq_dir, f"{folder}_rank001.fasta")
                 with open(folder_fasta, 'w') as f:
                     f.write(f"{header}\n{seq}\n")
 
 def main(args):
     result_base = os.path.join(args.af_models, 'output_results')
-    os.makedirs(result_base, exist_ok=True)
-
-    if args.output_csv == 'output.csv':
-        args.output_csv = os.path.join(result_base, 'all_results.csv')
-    if args.filtered_output_csv == 'filtered_output.csv':
-        args.filtered_output_csv = os.path.join(result_base, 'filtered_results.csv')
-    if args.summary_file == 'summary_foldabilityTest.txt':
-        args.summary_file = os.path.join(result_base, 'summary_foldabilityTest.txt')
-    if args.plot_file == 'pldds_vs_rmsd_plot.png':
-        args.plot_file = os.path.join(result_base, 'pldds_vs_rmsd_plot.png')
-
     filtered_model_dir = os.path.join(args.af_models, 'foldabilityTest_filtered', 'models')
+    os.makedirs(result_base, exist_ok=True)
     os.makedirs(filtered_model_dir, exist_ok=True)
 
-    print("Processing models from:", args.af_models)
     df = process_pdb_files(args.af_models, args.rfdiff_backbones)
-    print(f"Found {len(df)} total models.")
-
     summary = []
 
     if not df.empty:
@@ -56,38 +120,33 @@ def main(args):
         summary.append("No data processed. Dataframe is empty.")
 
     filtered_df = filter_surpassing_thresholds(df, args.plddt_threshold, args.rmsd_threshold)
-    print(f"Filtered to {len(filtered_df)} models that passed thresholds.")
+    print("Filtered:", len(filtered_df), "models.")
 
     if not filtered_df.empty:
         filtered_df.to_csv(args.filtered_output_csv, index=False)
-        summary.append(f"Filtered dataframe created and saved to {args.filtered_output_csv}")
+        summary.append(f"Filtered dataframe saved to {args.filtered_output_csv}")
     else:
-        summary.append("No data surpassing thresholds. Filtered dataframe is empty.")
-
-    summary.append("Filenames of the entries that surpass both thresholds:")
+        summary.append("No data passed thresholds.")
 
     for idx, row in filtered_df.iterrows():
-        summary.append(row['file_name'])
-        model_path = os.path.join(args.af_models, row['folder_name'], row['file_name'])
-        if os.path.isfile(model_path):
-            shutil.copy(model_path, os.path.join(filtered_model_dir, row['folder_name'] + "_rank_001.pdb"))
+        src = os.path.join(args.af_models, row['folder_name'], row['file_name'])
+        dst = os.path.join(filtered_model_dir, row['folder_name'] + "_rank_001.pdb")
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
 
-    # Create FASTA files from filtered sequences
     create_fasta_from_filtered_df(filtered_df, os.path.join(args.af_models, 'foldabilityTest_filtered'))
 
-    # Second step: evaluate all models per passing backbone
-    summary.append("\n--- Per-folder multi-model check ---")
-    folder_counts = {}
+    # Optional: folder-level pass rate summary
+    summary.append("\n--- Folder-level summary ---")
     for folder in filtered_df['folder_name'].unique():
         folder_path = os.path.join(args.af_models, folder)
         try:
-            ref_path = os.path.join(args.rfdiff_backbones, f"_{folder}.pdb")
-            ref_alpha_carbons, _, _ = parse_pdb(ref_path, chain='A')
+            ref_path = os.path.join(args.rfdiff_backbones, f"{folder}.pdb")
+            ref_alpha_carbons, _, _ = parse_pdb(ref_path)
         except FileNotFoundError:
             continue
 
-        pass_count = 0
-        total_count = 0
+        total = passed = 0
         for file in os.listdir(folder_path):
             if file.endswith(".pdb"):
                 try:
@@ -95,49 +154,42 @@ def main(args):
                 except:
                     continue
                 if len(coords) == len(ref_alpha_carbons) and 'G' * 15 not in seq:
-                    total_count += 1
+                    total += 1
                     rmsd = superpose_and_calculate_rmsd(ref_alpha_carbons, coords)
                     avg_plddt = sum(plddts) / len(plddts)
                     if avg_plddt > args.plddt_threshold and rmsd < args.rmsd_threshold:
-                        pass_count += 1
-        summary.append(f"{folder}: {pass_count}/{total_count} models passed")
-        folder_counts[folder] = (pass_count, total_count)
+                        passed += 1
+        summary.append(f"{folder}: {passed}/{total} models passed")
 
-    # Plot with annotation of per-folder passing ratios
+    # Plotting
     if not df.empty:
         plt.figure(figsize=(10, 6))
         folders = df['folder_name'].unique()
-        num_colors_needed = len(folders)
-        colors = plt.cm.tab20(np.linspace(0, 1, num_colors_needed))
-        folder_color_map = {folder: colors[i] for i, folder in enumerate(folders)}
+        colors = plt.cm.tab20(np.linspace(0, 1, len(folders)))
+        folder_color_map = {f: c for f, c in zip(folders, colors)}
 
-        for folder, color in folder_color_map.items():
+        for folder in folders:
             folder_data = df[df['folder_name'] == folder]
-            plt.scatter(folder_data['rmsd'], folder_data['plddt'], label=f"{folder} ({folder_counts.get(folder, ('?', '?'))[0]}/{folder_counts.get(folder, ('?', '?'))[1]})", color=color, alpha=0.7)
+            plt.scatter(folder_data['rmsd'], folder_data['plddt'], label=folder, color=folder_color_map[folder], alpha=0.7)
 
-        plt.axhline(y=args.plddt_threshold, color='r', linestyle='--', label=f'pLDDT threshold = {args.plddt_threshold}')
-        plt.axvline(x=args.rmsd_threshold, color='b', linestyle='--', label=f'RMSD threshold = {args.rmsd_threshold}')
-        plt.title('RMSD vs. Overall Alpha Carbon pLDDT')
+        plt.axhline(y=args.plddt_threshold, color='r', linestyle='--', label=f'pLDDT > {args.plddt_threshold}')
+        plt.axvline(x=args.rmsd_threshold, color='b', linestyle='--', label=f'RMSD < {args.rmsd_threshold}')
         plt.xlabel('RMSD')
         plt.ylabel('pLDDT')
-        plt.legend(loc='upper right', fontsize='small')
+        plt.title('RMSD vs. pLDDT')
+        plt.legend(fontsize='small')
         plt.grid(True)
-        plt.savefig(args.plot_file, bbox_inches='tight')
+        plt.savefig(args.plot_file)
         summary.append("Plot saved to " + args.plot_file)
 
     with open(args.summary_file, 'w') as f:
         for line in summary:
             f.write(line + '\n')
 
-    print("Summary saved to " + args.summary_file)
+    print("Summary saved to", args.summary_file)
 
-
-# Entry point for SLURM or manual command-line usage
 if __name__ == "__main__":
     print("=== Starting foldability test script ===")
-
-    import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--af-models', required=True)
     parser.add_argument('--rfdiff-backbones', required=True)
@@ -148,5 +200,4 @@ if __name__ == "__main__":
     parser.add_argument('--plddt_threshold', type=float, default=90.0)
     parser.add_argument('--rmsd_threshold', type=float, default=2.0)
     args = parser.parse_args()
-
     main(args)
