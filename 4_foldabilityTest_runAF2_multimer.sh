@@ -11,36 +11,59 @@ source /share/yarovlab/ahgz/.bashrc
 conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
-usage() {
-    echo "Usage: $0 -f FASTA_FILE -o OUTPUT_DIR -t TARGET_SEQUENCE -p TEMPLATE_PDB"
-    echo "  -f FASTA_FILE       Path to input FASTA file (binder sequences)"
-    echo "  -o OUTPUT_DIR       Output directory"
-    echo "  -t TARGET_SEQUENCE  Target sequence string to append after ':'"
-    echo "  -p TEMPLATE_PDB     Template PDB file path"
+print_usage() {
+    echo "Usage: sbatch $0 --fasta_file FASTA --output_path DIR --target_sequence SEQ --template_pdb PDB"
+    echo ""
+    echo "Arguments:"
+    echo "  --fasta_file        Path to binder FASTA file"
+    echo "  --output_path       Output directory"
+    echo "  --target_sequence   Target sequence string to append with ':'"
+    echo "  --template_pdb      Template PDB file path"
+    echo "  --help              Show this help message and exit"
     exit 1
 }
 
-# Parse arguments
-while getopts ":f:o:t:p:h" opt; do
-    case ${opt} in
-        f ) FASTA_FILE=$OPTARG ;;
-        o ) OUTPUT_DIR=$OPTARG ;;
-        t ) TARGET_SEQUENCE=$OPTARG ;;
-        p ) TEMPLATE_PDB=$OPTARG ;;
-        h ) usage ;;
-        \? ) usage ;;
+# Initialize variables
+FASTA_FILE=""
+OUTPUT_PATH=""
+TARGET_SEQUENCE=""
+TEMPLATE_PDB=""
+
+# Parse long arguments
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --fasta_file)
+            FASTA_FILE="$2"
+            shift; shift ;;
+        --output_path)
+            OUTPUT_PATH="$2"
+            shift; shift ;;
+        --target_sequence)
+            TARGET_SEQUENCE="$2"
+            shift; shift ;;
+        --template_pdb)
+            TEMPLATE_PDB="$2"
+            shift; shift ;;
+        --help)
+            print_usage ;;
+        *)
+            echo "Unknown option: $1"
+            print_usage ;;
     esac
 done
 
-if [[ -z "$FASTA_FILE" || -z "$OUTPUT_DIR" || -z "$TARGET_SEQUENCE" || -z "$TEMPLATE_PDB" ]]; then
-    usage
+# Validate required args
+if [[ -z "$FASTA_FILE" || -z "$OUTPUT_PATH" || -z "$TARGET_SEQUENCE" || -z "$TEMPLATE_PDB" ]]; then
+    echo "Missing required arguments."
+    print_usage
 fi
 
-mkdir -p "$OUTPUT_DIR"
-COMBINED_FASTA="$OUTPUT_DIR/input_multimer_with_target.fasta"
+mkdir -p "$OUTPUT_PATH"
+COMBINED_FASTA="$OUTPUT_PATH/input_multimer_with_target.fasta"
 > "$COMBINED_FASTA"
 
-echo "Preparing combined FASTA with preserved headers..."
+echo "🛠️  Preparing combined FASTA with original headers..."
 current_seq=""
 while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" =~ ^\> ]]; then
@@ -66,6 +89,6 @@ colabfold_batch \
     --model-type alphafold2_multimer_v3 \
     --num-recycle 5 \
     --num-seed 3 \
-    "$COMBINED_FASTA" "$OUTPUT_DIR"
+    "$COMBINED_FASTA" "$OUTPUT_PATH"
 
-echo "Multimer run complete. Output in: $OUTPUT_DIR"
+echo " Multimer modeling complete. Results saved to: $OUTPUT_PATH"
