@@ -46,14 +46,15 @@ mkdir -p "$output_dir"
 # Iterate over PDBs
 for pdb_file in "$folder_with_pdbs"/*.pdb; do
     echo "Processing $pdb_file"
-
     pdb_base=$(basename "$pdb_file" .pdb)
 
-    # Extract epitope fixed residues (e.g., A33 A34 A35 ...)
-    epitope_residues=$(/share/yarovlab/ahgz/scripts/nanobodies/find_epitope_positions.sh \
+    # Use updated epitope finder script
+    epitope_residues=$(/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/find_epitope_positions.sh \
         --pdb "$pdb_file" \
         --sequence "$epitope_sequence" \
         --chain "$chains_to_design")
+
+    echo "Epitope residues to fix: $epitope_residues"
 
     # Extract all residues for fixed chain(s)
     chain_fixed_residues=""
@@ -61,16 +62,20 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
         chain_residues=$(/share/yarovlab/ahgz/scripts/nanobodies/get_chain_residues.sh \
             --pdb "$pdb_file" \
             --chain "$chain")
-        chain_fixed_residues="$chain_fixed_residues $chain_residues"
+        # Add chain prefix to each residue
+        for pos in $chain_residues; do
+            chain_fixed_residues="$chain_fixed_residues ${chain}${pos}"
+        done
     done
 
-    # Combine fixed identifiers
+    echo "Fixed residues from target chain(s): $chain_fixed_residues"
+
+    # Combine all fixed positions
     all_fixed_positions="$epitope_residues $chain_fixed_residues"
 
     # Run LigandMPNN
     python /share/yarovlab/ahgz/apps/LigandMPNN/run.py \
-        --checkpoint_soluble_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
-        --model_type "soluble_mpnn" \
+        --model_type ligand_mpnn \
         --pdb_path "$pdb_file" \
         --out_folder "$output_dir" \
         --fixed_residues "$all_fixed_positions" \
