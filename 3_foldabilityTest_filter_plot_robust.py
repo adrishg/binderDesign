@@ -43,7 +43,9 @@ def main(args):
     filtered_model_dir = os.path.join(args.af_models, 'foldabilityTest_filtered', 'models')
     os.makedirs(filtered_model_dir, exist_ok=True)
 
+    print("Processing models from:", args.af_models)
     df = process_pdb_files(args.af_models, args.rfdiff_backbones)
+    print(f"Found {len(df)} total models.")
 
     summary = []
 
@@ -54,6 +56,7 @@ def main(args):
         summary.append("No data processed. Dataframe is empty.")
 
     filtered_df = filter_surpassing_thresholds(df, args.plddt_threshold, args.rmsd_threshold)
+    print(f"Filtered to {len(filtered_df)} models that passed thresholds.")
 
     if not filtered_df.empty:
         filtered_df.to_csv(args.filtered_output_csv, index=False)
@@ -127,3 +130,23 @@ def main(args):
             f.write(line + '\n')
 
     print("Summary saved to " + args.summary_file)
+
+
+# Entry point for SLURM or manual command-line usage
+if __name__ == "__main__":
+    print("=== Starting foldability test script ===")
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--af-models', required=True)
+    parser.add_argument('--rfdiff-backbones', required=True)
+    parser.add_argument('--output_csv', default='output.csv')
+    parser.add_argument('--filtered_output_csv', default='filtered_output.csv')
+    parser.add_argument('--summary_file', default='summary_foldabilityTest.txt')
+    parser.add_argument('--plot_file', default='pldds_vs_rmsd_plot.png')
+    parser.add_argument('--plddt_threshold', type=float, default=90.0)
+    parser.add_argument('--rmsd_threshold', type=float, default=2.0)
+    args = parser.parse_args()
+
+    main(args)
