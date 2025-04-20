@@ -4,8 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 import shutil
-import re
 
+# Amino acid 3-letter to 1-letter map
 three_to_one = {
     'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
     'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
@@ -86,26 +86,30 @@ def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
 
 def create_combined_fasta(filtered_df, output_fasta_path):
     with open(output_fasta_path, 'w') as f:
-        for idx, row in filtered_df.iterrows():
-            folder = row['folder_name']
-            file = row['file_name']
+        for _, row in filtered_df.iterrows():
+            filename = row['file_name']
             sequence = row['sequence']
-            match = re.search(r'(\d+)', file)
-            seq_id = match.group(1) if match else "001"
-            header = f">{folder}_{seq_id}"
-            f.write(f"{header}\n{sequence}\n")
+            header = "unknown_id"
+
+            if "_unrelaxed" in filename:
+                prefix = filename.split("_unrelaxed")[0]
+                header = prefix  # becomes <backbone>_<seqID>
+
+            f.write(f">{header}\n{sequence}\n")
 
 def main(args):
     os.makedirs(args.output_dir, exist_ok=True)
     model_dir = os.path.join(args.output_dir, "models")
     os.makedirs(model_dir, exist_ok=True)
 
+    # Output files
     output_all_csv = os.path.join(args.output_dir, "all_results.csv")
     output_filtered_csv = os.path.join(args.output_dir, "filtered_results.csv")
     output_summary = os.path.join(args.output_dir, "summary_foldabilityTest.txt")
     output_plot = os.path.join(args.output_dir, "pldds_vs_rmsd_plot.png")
     output_fasta = os.path.join(args.output_dir, "filtered_passed_seqs.fasta")
 
+    # Process models
     df = process_pdb_files(args.af_models, args.rfdiff_backbones)
     summary = []
 
@@ -126,7 +130,7 @@ def main(args):
     else:
         summary.append("No models passed thresholds.")
 
-    for idx, row in filtered_df.iterrows():
+    for _, row in filtered_df.iterrows():
         src = os.path.join(args.af_models, row['folder_name'], row['file_name'])
         dst = os.path.join(model_dir, row['folder_name'] + "_" + row['file_name'])
         if os.path.isfile(src):
