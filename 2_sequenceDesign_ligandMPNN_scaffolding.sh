@@ -69,7 +69,8 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
 
     # Run LigandMPNN
     python /share/yarovlab/ahgz/apps/LigandMPNN/run.py \
-        --model_type ligand_mpnn \
+        --checkpoint_soluble_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
+        --model_type "soluble_mpnn" \
         --pdb_path "$pdb_file" \
         --out_folder "$output_dir" \
         --fixed_residues "$all_fixed_positions" \
