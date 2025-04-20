@@ -24,7 +24,7 @@ usage() {
     echo "  -f    Path to folder with PDBs"
     echo "  -o    Path to output directory"
     echo "  -c    Chains to design (default: A)"
-    echo "  -e    Epitope sequence (default: LLLQKKYKDVESSLK)"
+    echo "  -e    Epitope sequence (default: EDLKGYLDWITQAED)"
     exit 1
 }
 
@@ -50,7 +50,7 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
     pdb_base=$(basename "$pdb_file" .pdb)
 
     # Extract epitope fixed residues (e.g., A33 A34 A35 ...)
-    epitope_residues=$(./share/yarovlab/ahgz/scripts/nanobodies/find_epitope_positions.sh \
+    epitope_residues=$(/share/yarovlab/ahgz/scripts/nanobodies/find_epitope_positions.sh \
         --pdb "$pdb_file" \
         --sequence "$epitope_sequence" \
         --chain "$chains_to_design")
@@ -58,7 +58,7 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
     # Extract all residues for fixed chain(s)
     chain_fixed_residues=""
     for chain in $(echo "$chains_to_fix" | fold -w1); do
-        chain_residues=$(./share/yarovlab/ahgz/scripts/nanobodies/get_chain_residues.sh \
+        chain_residues=$(/share/yarovlab/ahgz/scripts/nanobodies/get_chain_residues.sh \
             --pdb "$pdb_file" \
             --chain "$chain")
         chain_fixed_residues="$chain_fixed_residues $chain_residues"
@@ -69,14 +69,14 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
 
     # Run LigandMPNN
     python /share/yarovlab/ahgz/apps/LigandMPNN/run.py \
+        --model_type ligand_mpnn \
         --pdb_path "$pdb_file" \
         --out_folder "$output_dir" \
-        --fixed_positions "$all_fixed_positions" \
-        --chain_id_design "$chains_to_design" \
+        --fixed_residues "$all_fixed_positions" \
+        --chains_to_design "$chains_to_design" \
         --batch_size 30 \
-        --sampling_temp 0.1 \
+        --number_of_batches 1 \
+        --temperature 0.1 \
         --seed 37 \
-        --omit_AA "X" \
-        --save_score_per_seq \
-        --save_probs
+        --omit_AA "X"
 done
