@@ -1,15 +1,16 @@
 #!/bin/bash
 
-# Default values
-chain=""
-pdb_file=""
-epitope=""
+# Usage:
+# find_epitope_positions.sh --pdb <pdb_file> --sequence <epitope_sequence> --chain <chain_id>
 
-# Parse command-line flags
+pdb=""
+epitope=""
+chain=""
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --pdb)
-            pdb_file="$2"
+            pdb="$2"
             shift 2
             ;;
         --sequence)
@@ -32,20 +33,26 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check required arguments
-if [ -z "$pdb_file" ] || [ -z "$epitope" ] || [ -z "$chain" ]; then
+if [ -z "$pdb" ] || [ -z "$epitope" ] || [ -z "$chain" ]; then
     echo "Error: --pdb, --sequence, and --chain are required."
     exit 1
 fi
 
-# Extract sequence only for the specified chain
-output_file="sequence_${chain}.fasta"
-/share/yarovlab/ahgz/scripts/nanobodies/pdb2fasta.sh "$pdb_file" | awk -v ch="$chain" '/^>/{keep=($0 ~ ">"ch)} keep' > "$output_file"
+# Call chain-aware pdb2fasta script
+fasta_output=$(/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/pdb2fasta.sh \
+    --pdb "$pdb" \
+    --chain "$chain")
 
-# Read the sequence as a single line
-sequence=$(tr -d '\n' < "$output_file" | grep -v "^>")
+# Extract only the sequence line (skip the >A header)
+sequence=$(echo "$fasta_output" | awk '/^>/ {getline; print}')
 
-# Find epitope match
+# Sanity check
+if [[ -z "$sequence" ]]; then
+    echo "Error: Unable to extract sequence from chain $chain in $pdb"
+    exit 1
+fi
+
+# Search for epitope inside sequence
 epitope_length=${#epitope}
 positions=()
 
@@ -59,11 +66,10 @@ for (( i=0; i<=${#sequence}-$epitope_length; i++ )); do
     fi
 done
 
-# Check if match was found
+# Output result
 if [ ${#positions[@]} -eq 0 ]; then
     echo "No match found for epitope in chain $chain."
-    exit 1
+    exit 0
+else
+    echo "${positions[@]}"
 fi
-
-# Output space-separated positions
-echo "${positions[@]}"

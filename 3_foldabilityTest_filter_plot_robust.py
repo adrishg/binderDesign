@@ -1,7 +1,33 @@
+import os
 import shutil
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+def create_fasta_from_filtered_df(filtered_df, base_dir):
+    """
+    Creates:
+    - One combined FASTA file
+    - One FASTA per model folder
+    """
+    seq_dir = os.path.join(base_dir, 'sequences')
+    os.makedirs(seq_dir, exist_ok=True)
+
+    combined_fasta = os.path.join(seq_dir, 'foldabilityTest_filtered_passed_seqs.fasta')
+    with open(combined_fasta, 'w') as fasta_all:
+        for idx, row in filtered_df.iterrows():
+            folder = row['folder_name']
+            seq = row.get('sequence', None)
+            if seq and isinstance(seq, str):
+                header = f">{folder}_rank001"
+                fasta_all.write(f"{header}\n{seq}\n")
+
+                # Write individual FASTA per folder
+                folder_fasta = os.path.join(seq_dir, f"{folder}_rank001.fasta")
+                with open(folder_fasta, 'w') as f:
+                    f.write(f"{header}\n{seq}\n")
 
 def main(args):
-    # Set default paths based on input if not provided
     result_base = os.path.join(args.af_models, 'output_results')
     os.makedirs(result_base, exist_ok=True)
 
@@ -14,7 +40,7 @@ def main(args):
     if args.plot_file == 'pldds_vs_rmsd_plot.png':
         args.plot_file = os.path.join(result_base, 'pldds_vs_rmsd_plot.png')
 
-    filtered_model_dir = os.path.join(args.af_models, 'foldabilityTest_filtered')
+    filtered_model_dir = os.path.join(args.af_models, 'foldabilityTest_filtered', 'models')
     os.makedirs(filtered_model_dir, exist_ok=True)
 
     df = process_pdb_files(args.af_models, args.rfdiff_backbones)
@@ -42,6 +68,9 @@ def main(args):
         model_path = os.path.join(args.af_models, row['folder_name'], row['file_name'])
         if os.path.isfile(model_path):
             shutil.copy(model_path, os.path.join(filtered_model_dir, row['folder_name'] + "_rank_001.pdb"))
+
+    # Create FASTA files from filtered sequences
+    create_fasta_from_filtered_df(filtered_df, os.path.join(args.af_models, 'foldabilityTest_filtered'))
 
     # Second step: evaluate all models per passing backbone
     summary.append("\n--- Per-folder multi-model check ---")

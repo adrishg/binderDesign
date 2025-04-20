@@ -2,7 +2,7 @@
 #SBATCH -p gpu-vladimir
 #SBATCH --gres=gpu:1
 #SBATCH -t 1-12:00:00
-#SBATCH --job-name=ligand_design
+#SBATCH --job-name=soluble_mpnn
 #SBATCH --mem=125G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu
 #SBATCH --mail-type=END
@@ -18,9 +18,9 @@ chains_to_design="A"
 chains_to_fix="B"
 epitope_sequence="EDLKGYLDWITQAED"
 
-# Helper script paths
+# Script paths
 epitope_script="/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/find_epitope_positions.sh"
-chain_script="/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/pdb2fasta_ligandMPNN.sh"
+chain_script="/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/pdb2fasta.sh"
 
 # Function to display usage
 usage() {
@@ -52,25 +52,32 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
     echo "Processing $pdb_file"
     pdb_base=$(basename "$pdb_file" .pdb)
 
-    # --- Extract fixed epitope residues ---
-    epitope_residues=$($epitope_script --pdb "$pdb_file" --sequence "$epitope_sequence" --chain "$chains_to_design")
+    # --- Extract epitope residue positions ---
+    epitope_residues=$(/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/find_epitope_positions.sh \
+        --pdb "$pdb_file" \
+        --sequence "$epitope_sequence" \
+        --chain "$chains_to_design")
+
     echo "Epitope residues to fix: $epitope_residues"
 
-    # --- Extract fixed residues from other chain(s) ---
+    # --- Extract fixed residues from chain(s) ---
     chain_fixed_residues=""
     for chain in $(echo "$chains_to_fix" | fold -w1); do
-        residues=$($chain_script --pdb "$pdb_file" --chain "$chain")
+        residues=$(/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/pdb2fasta_ligandMPNN.sh \
+            --pdb "$pdb_file" \
+            --chain "$chain")
         chain_fixed_residues="$chain_fixed_residues $residues"
     done
+
     echo "Fixed residues from target chain(s): $chain_fixed_residues"
 
-    # Combine fixed positions for LigandMPNN
+    # Combine all fixed residues
     all_fixed_positions="$epitope_residues $chain_fixed_residues"
 
     # --- Run SolubleMPNN ---
     python /share/yarovlab/ahgz/apps/LigandMPNN/run.py \
-        --checkpoint_soluble_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
         --model_type "soluble_mpnn" \
+        --checkpoint_soluble_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
         --pdb_path "$pdb_file" \
         --out_folder "$output_dir" \
         --fixed_residues "$all_fixed_positions" \
@@ -79,5 +86,4 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
         --number_of_batches 1 \
         --temperature 0.1 \
         --seed 37
-
 done
