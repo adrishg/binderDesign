@@ -52,4 +52,18 @@ positions=()
 for (( i=0; i<=${#sequence}-$epitope_length; i++ )); do
     if [ "${sequence:$i:$epitope_length}" == "$epitope" ]; then
         for (( j=0; j<$epitope_length; j++ )); do
-            pos=$((i
+            pos=$((i + j + 1))
+            positions+=("${chain}${pos}")
+        done
+        break
+    fi
+done
+
+# Check if match was found
+if [ ${#positions[@]} -eq 0 ]; then
+    echo "No match found for epitope in chain $chain."
+    exit 1
+fi
+
+# Output space-separated positions
+echo "${positions[@]}"

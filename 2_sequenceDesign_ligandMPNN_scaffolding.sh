@@ -18,6 +18,10 @@ chains_to_design="A"
 chains_to_fix="B"
 epitope_sequence="EDLKGYLDWITQAED"
 
+# Helper script paths
+epitope_script="/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/find_epitope_positions.sh"
+chain_script="/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/pdb2fasta_ligandMPNN.sh"
+
 # Function to display usage
 usage() {
     echo "Usage: $0 [-f folder_with_pdbs] [-o output_dir] [-c chains_to_design] [-e epitope_sequence]"
@@ -48,35 +52,25 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
     echo "Processing $pdb_file"
     pdb_base=$(basename "$pdb_file" .pdb)
 
-    # Use updated epitope finder script
-    epitope_residues=$(/share/yarovlab/ahgz/scripts/binderDesign/bash_tools/find_epitope_positions.sh \
-        --pdb "$pdb_file" \
-        --sequence "$epitope_sequence" \
-        --chain "$chains_to_design")
-
+    # --- Extract fixed epitope residues ---
+    epitope_residues=$($epitope_script --pdb "$pdb_file" --sequence "$epitope_sequence" --chain "$chains_to_design")
     echo "Epitope residues to fix: $epitope_residues"
 
-    # Extract all residues for fixed chain(s)
+    # --- Extract fixed residues from other chain(s) ---
     chain_fixed_residues=""
     for chain in $(echo "$chains_to_fix" | fold -w1); do
-        chain_residues=$(/share/yarovlab/ahgz/scripts/nanobodies/get_chain_residues.sh \
-            --pdb "$pdb_file" \
-            --chain "$chain")
-        # Add chain prefix to each residue
-        for pos in $chain_residues; do
-            chain_fixed_residues="$chain_fixed_residues ${chain}${pos}"
-        done
+        residues=$($chain_script --pdb "$pdb_file" --chain "$chain")
+        chain_fixed_residues="$chain_fixed_residues $residues"
     done
-
     echo "Fixed residues from target chain(s): $chain_fixed_residues"
 
-    # Combine all fixed positions
+    # Combine fixed positions for LigandMPNN
     all_fixed_positions="$epitope_residues $chain_fixed_residues"
 
-    # Run LigandMPNN
+    # --- Run SolubleMPNN ---
     python /share/yarovlab/ahgz/apps/LigandMPNN/run.py \
         --checkpoint_soluble_mpnn "/share/yarovlab/ahgz/apps/LigandMPNN/model_params/solublempnn_v_48_020.pt" \
-        --model_type ligand_mpnn \
+        --model_type "soluble_mpnn" \
         --pdb_path "$pdb_file" \
         --out_folder "$output_dir" \
         --fixed_residues "$all_fixed_positions" \
@@ -84,6 +78,6 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
         --batch_size 30 \
         --number_of_batches 1 \
         --temperature 0.1 \
-        --seed 37 \
-        --omit_AA "X"
+        --seed 37
+
 done
