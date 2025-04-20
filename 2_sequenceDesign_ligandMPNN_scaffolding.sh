@@ -2,7 +2,7 @@
 #SBATCH -p gpu-vladimir
 #SBATCH --gres=gpu:1
 #SBATCH -t 1-12:00:00
-#SBATCH --job-name=soluble_mpnn
+#SBATCH --job-name=sequenceDesign_lMPNN_scaffolding
 #SBATCH --mem=125G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu
 #SBATCH --mail-type=END

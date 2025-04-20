@@ -63,7 +63,7 @@ mkdir -p "$OUTPUT_PATH"
 COMBINED_FASTA="$OUTPUT_PATH/input_multimer_with_target.fasta"
 > "$COMBINED_FASTA"
 
-echo "🛠️  Preparing combined FASTA with original headers..."
+echo "Preparing combined FASTA with original headers..."
 current_seq=""
 while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" =~ ^\> ]]; then

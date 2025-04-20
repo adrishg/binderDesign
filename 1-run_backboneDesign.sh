@@ -2,7 +2,7 @@
 #SBATCH -p gpu-vladimir     # Partition name
 #SBATCH --gres=gpu:1        # Request 2 GPUs
 #SBATCH -t 10-12:00:00       # 1 day, adjust as needed
-#SBATCH --job-name=cav22_aid_RFD # Job name
+#SBATCH --job-name=backboneDesign # Job name
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Email after run
 #SBATCH --mail-type=END
 
