@@ -50,7 +50,7 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
     pdb_base=$(basename "$pdb_file" .pdb)
 
     # Extract epitope fixed residues (e.g., A33 A34 A35 ...)
-    epitope_residues=$(python /share/yarovlab/ahgz/scripts/nanobodies/find_epitope_positions.sh \
+    epitope_residues=$(./share/yarovlab/ahgz/scripts/nanobodies/find_epitope_positions.sh \
         --pdb "$pdb_file" \
         --sequence "$epitope_sequence" \
         --chain "$chains_to_design")
@@ -58,7 +58,7 @@ for pdb_file in "$folder_with_pdbs"/*.pdb; do
     # Extract all residues for fixed chain(s)
     chain_fixed_residues=""
     for chain in $(echo "$chains_to_fix" | fold -w1); do
-        chain_residues=$(python /share/yarovlab/ahgz/scripts/nanobodies/get_chain_residues.sh \
+        chain_residues=$(./share/yarovlab/ahgz/scripts/nanobodies/get_chain_residues.sh \
             --pdb "$pdb_file" \
             --chain "$chain")
         chain_fixed_residues="$chain_fixed_residues $chain_residues"
