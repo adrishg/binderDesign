@@ -85,10 +85,12 @@ fi
 echo "Running ColabFold multimer..."
 colabfold_batch \
     --msa-mode single_sequence \
-    --templates "$TEMPLATE_PDB" \
+    --templates \
+    --custom-template-path "$TEMPLATE_PDB" \
     --model-type alphafold2_multimer_v3 \
     --num-recycle 5 \
-    --num-seed 3 \
+    --num-seeds 3 \
     "$COMBINED_FASTA" "$OUTPUT_PATH"
+
 
 echo " Multimer modeling complete. Results saved to: $OUTPUT_PATH"
