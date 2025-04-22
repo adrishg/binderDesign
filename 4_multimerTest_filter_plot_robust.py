@@ -83,7 +83,9 @@ def process_multimer_models(af_models, rfdiff_backbones):
                             'rmsd': rmsd,
                             'iptm': iptm
                         })
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+    print("Processed dataframe with", len(df), "entries.")
+    return df
 
 def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
     if df.empty or 'plddt' not in df.columns or 'rmsd' not in df.columns:
@@ -125,7 +127,6 @@ def evaluate_all_models_for_passing_folders(filtered_df, args, ref_dir, model_di
                             'rmsd': rmsd,
                             'iptm': iptm
                         })
-
                         dst = os.path.join(model_dir, f"{folder}_{file}")
                         if os.path.isfile(model_path):
                             shutil.copy(model_path, dst)
@@ -172,7 +173,8 @@ def main(args):
         df.to_csv(output_all_csv, index=False)
         summary.append(f"Saved all results to {output_all_csv}")
     else:
-        summary.append("No data processed. Dataframe is empty.")
+        summary.append("No models processed (empty dataframe).")
+        df.to_csv(output_all_csv, index=False)
 
     filtered_df = filter_surpassing_thresholds(df, args.plddt_threshold, args.rmsd_threshold)
     print("Filtered models:", len(filtered_df))
@@ -186,10 +188,13 @@ def main(args):
         summary.append(f"FASTA file written to {output_fasta}")
     else:
         summary.append("No models passed thresholds.")
+        pd.DataFrame().to_csv(output_filtered_csv, index=False)
 
-    if not df.empty:
+    if not df.empty and all(col in df.columns for col in ['rmsd', 'plddt', 'iptm']):
         plot_iptm_colored_scatter(df, args.plddt_threshold, args.rmsd_threshold, output_plot)
         summary.append(f"Plot saved to {output_plot}")
+    else:
+        summary.append("Skipping plot generation due to missing columns in dataframe.")
 
     with open(output_summary, 'w') as f:
         for line in summary:
