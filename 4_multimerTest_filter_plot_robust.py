@@ -22,22 +22,30 @@ def extract_backbone_id_from_filename(filename):
     return f"_{match.group(1)}" if match else None
 
 def extract_iptm(json_path):
+    print(f"  Checking ipTM from: {json_path}")
     if not os.path.isfile(json_path):
+        print("  JSON file not found.")
         return None
     try:
         with open(json_path, 'r') as f:
             data = json.load(f)
+            print(f"  Loaded JSON keys: {list(data.keys())}")
             iptm = data.get("ranking_confidences", {}).get("iptm")
             if iptm is not None:
+                print("  Found iptm in ranking_confidences")
                 return iptm
             iptm_flat = data.get("iptm")
             if isinstance(iptm_flat, float):
+                print("  Found flat iptm")
                 return iptm_flat
             iptm_dict = data.get("metrics", {}).get("iptm")
             if isinstance(iptm_dict, dict):
+                print("  Found iptm under metrics")
                 return iptm_dict.get("score")
+            print("  ipTM not found in any expected format")
             return None
-    except:
+    except Exception as e:
+        print(f"  Failed to parse JSON: {e}")
         return None
 
 def extract_sequence_and_coords(pdb_path, chain_id):
@@ -127,7 +135,9 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
         if model_pattern:
             tag = model_pattern.group()
             json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and tag in f), None)
+        print(f"  Matching JSON file: {json_file}" if json_file else "  No matching JSON file found.")
         iptm = extract_iptm(os.path.join(af_models, json_file)) if json_file else None
+        print(f"  ipTM: {iptm}")
         avg_plddt = np.mean([float(line[60:66]) for line in open(model_path) if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
         passed = (rmsd is not None and rmsd < rmsd_threshold and avg_plddt > plddt_threshold)
         if passed:
@@ -153,8 +163,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
 
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
+        print(f"Plotting {len(df_plot)} entries.")
         try:
-            print(f"Generating plot for {len(df_plot)} models...")
             plt.figure(figsize=(10, 7))
             scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
             plt.xlabel("RMSD (A after B-align)")
@@ -172,8 +182,6 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
             print(f"Saved plot to {plot_path}")
         except Exception as e:
             print(f"Failed to generate/save plot: {e}")
-    else:
-        print("Plotting skipped: no valid entries.")
 
     print(f"\nSaved all to {output_dir}")
 
