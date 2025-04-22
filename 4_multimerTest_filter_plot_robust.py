@@ -6,6 +6,8 @@ import json
 import re
 import shutil
 from Bio.Align import PairwiseAligner
+import matplotlib
+matplotlib.use('Agg')  # Force headless backend
 import matplotlib.pyplot as plt
 
 three_to_one = {
@@ -152,21 +154,24 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
         print(f"Plotting {len(df_plot)} entries.")
-        plt.figure(figsize=(10, 7))
-        scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
-        plt.xlabel("RMSD (A after B-align)")
-        plt.ylabel("pLDDT (Chain A)")
-        plt.title("Foldability Test: RMSD vs pLDDT (Colored by ipTM)")
-        cbar = plt.colorbar(scatter)
-        cbar.set_label("ipTM Score")
-        plt.axhline(y=plddt_threshold, color='red', linestyle='--', label=f'pLDDT > {plddt_threshold}')
-        plt.axvline(x=rmsd_threshold, color='blue', linestyle='--', label=f'RMSD < {rmsd_threshold}')
-        plt.legend()
-        plt.grid(True)
-        plot_path = os.path.join(output_dir, "multimerTest_plot_rmsd_plddt_ipTM.png")
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        print(f"Saved plot to {plot_path}")
+        try:
+            plt.figure(figsize=(10, 7))
+            scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
+            plt.xlabel("RMSD (A after B-align)")
+            plt.ylabel("pLDDT (Chain A)")
+            plt.title("Foldability Test: RMSD vs pLDDT (Colored by ipTM)")
+            cbar = plt.colorbar(scatter)
+            cbar.set_label("ipTM Score")
+            plt.axhline(y=plddt_threshold, color='red', linestyle='--', label=f'pLDDT > {plddt_threshold}')
+            plt.axvline(x=rmsd_threshold, color='blue', linestyle='--', label=f'RMSD < {rmsd_threshold}')
+            plt.legend()
+            plt.grid(True)
+            plot_path = os.path.join(output_dir, "multimerTest_plot_rmsd_plddt_ipTM.png")
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"Saved plot to {plot_path}")
+        except Exception as e:
+            print(f"Failed to generate/save plot: {e}")
 
     print(f"\nSaved all to {output_dir}")
 
