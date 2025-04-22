@@ -22,9 +22,7 @@ def extract_backbone_id_from_filename(filename):
     return f"_{match.group(1)}" if match else None
 
 def extract_iptm(json_path):
-    print(f"  Checking ipTM from: {json_path}")
     if not os.path.isfile(json_path):
-        print("  JSON file not found.")
         return None
     try:
         with open(json_path, 'r') as f:
@@ -39,8 +37,7 @@ def extract_iptm(json_path):
         if isinstance(iptm_dict, dict):
             return iptm_dict.get("score")
         return None
-    except Exception as e:
-        print(f"  Failed to parse JSON: {e}")
+    except Exception:
         return None
 
 def extract_sequence_and_coords(pdb_path, chain_id):
@@ -126,10 +123,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
             R, center_model, center_ref, matched_B, rmsd_B = align_result
             rmsd, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
         base_prefix = file.replace("unrelaxed", "scores").replace(".pdb", "")
-        json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and f.startswith(base_prefix)), None)
-        print(f"  Matching JSON file: {json_file}" if json_file else "  No matching JSON file found.")
+        json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and base_prefix in f), None)
         iptm = extract_iptm(os.path.join(af_models, json_file)) if json_file else None
-        print(f"  ipTM: {iptm}")
         avg_plddt = np.mean([float(line[60:66]) for line in open(model_path) if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
         passed = (rmsd is not None and rmsd < rmsd_threshold and avg_plddt > plddt_threshold)
         if passed:
@@ -155,13 +150,15 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
 
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
-        print(f"Plotting {len(df_plot)} entries.")
+        passed_count = df['passed'].sum()
+        total_count = len(df)
+        pct_passed = 100 * passed_count / total_count
         try:
             plt.figure(figsize=(10, 7))
             scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
             plt.xlabel("RMSD (A after B-align)")
             plt.ylabel("pLDDT (Chain A)")
-            plt.title("Foldability Test: RMSD vs pLDDT (Colored by ipTM)")
+            plt.title(f"Foldability Test: RMSD vs pLDDT (Colored by ipTM)\n{passed_count}/{total_count} passed ({pct_passed:.1f}%)")
             cbar = plt.colorbar(scatter)
             cbar.set_label("ipTM Score")
             plt.axhline(y=plddt_threshold, color='red', linestyle='--', label=f'pLDDT > {plddt_threshold}')
