@@ -163,8 +163,10 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
         plt.axvline(x=rmsd_threshold, color='blue', linestyle='--', label=f'RMSD < {rmsd_threshold}')
         plt.legend()
         plt.grid(True)
-        plt.savefig(os.path.join(output_dir, "multimerTest_plot_rmsd_plddt_ipTM.png"), dpi=300, bbox_inches='tight')
+        plot_path = os.path.join(output_dir, "multimerTest_plot_rmsd_plddt_ipTM.png")
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
         plt.close()
+        print(f"Saved plot to {plot_path}")
 
     print(f"\nSaved all to {output_dir}")
 
