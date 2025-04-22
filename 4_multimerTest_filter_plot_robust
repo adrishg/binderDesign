@@ -4,7 +4,6 @@ import pandas as pd
 import argparse
 import json
 import re
-import shutil
 from Bio.Align import PairwiseAligner
 
 three_to_one = {
@@ -19,17 +18,50 @@ def extract_backbone_id_from_filename(filename):
     return f"_{match.group(1)}" if match else None
 
 def extract_iptm(json_path):
+    print(f"  Checking ipTM from: {json_path}")
     if not os.path.isfile(json_path):
+        print("  JSON file not found.")
         return None
     try:
         with open(json_path, 'r') as f:
             data = json.load(f)
+            print(f"  Loaded JSON keys: {list(data.keys())}")
+            print(f"  Full JSON preview: {json.dumps(data, indent=2)[:1000]}")
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+            print(f"  Loaded JSON keys: {list(data.keys())}")
             iptm = data.get("ranking_confidences", {}).get("iptm")
             if iptm is not None:
+                print("  Found iptm in ranking_confidences")
                 return iptm
             iptm_flat = data.get("iptm")
             if isinstance(iptm_flat, float):
+                print("  Found flat iptm")
                 return iptm_flat
+            iptm_dict = data.get("metrics", {}).get("iptm")
+            if isinstance(iptm_dict, dict):
+                print("  Found iptm under metrics")
+                return iptm_dict.get("score")
+            print("  ipTM not found in any expected format")
+            return None
+    except Exception as e:
+        print(f"  Failed to parse JSON: {e}")
+        return None
+    except Exception as e:
+        print(f"  Failed to parse JSON: {e}")
+        return None
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+            # Try deep format used by AF3
+            iptm = data.get("ranking_confidences", {}).get("iptm")
+            if iptm is not None:
+                return iptm
+            # Try flat format used in older ColabFold
+            iptm_flat = data.get("iptm")
+            if isinstance(iptm_flat, float):
+                return iptm_flat
+            # Try dictionary format under metrics
             iptm_dict = data.get("metrics", {}).get("iptm")
             if isinstance(iptm_dict, dict):
                 return iptm_dict.get("score")
@@ -64,97 +96,108 @@ def align_by_sequence_and_kabsch(model_seq, model_coords, ref_seq, ref_coords):
     alignment = aligner.align(model_seq, ref_seq)[0]
     aligned_model_coords = []
     aligned_ref_coords = []
+
+    model_index = 0
+    ref_index = 0
+
     for a, b in zip(alignment.aligned[0], alignment.aligned[1]):
         for i in range(a[0], a[1]):
             for j in range(b[0], b[1]):
                 aligned_model_coords.append(model_coords[i])
                 aligned_ref_coords.append(ref_coords[j])
+
     if len(aligned_model_coords) < 3:
-        return "Too few aligned positions", None, None, None, None
+        return "Too few aligned positions", None, None, None
+
     model = np.array(aligned_model_coords)
     ref = np.array(aligned_ref_coords)
+
     model_center = model.mean(axis=0)
     ref_center = ref.mean(axis=0)
     model_centered = model - model_center
     ref_centered = ref - ref_center
+
     H = model_centered.T @ ref_centered
     U, _, Vt = np.linalg.svd(H)
     if np.linalg.det(U @ Vt) < 0:
         U[:, -1] *= -1
     R = U @ Vt
+
     rmsd_B = np.sqrt(np.mean(np.sum((model @ R + (ref_center - model_center) - ref) ** 2, axis=1)))
     return R, model_center, ref_center, len(aligned_model_coords), rmsd_B
 
 def transform_and_rmsd_chainA(model_file, backbone_file, R, center_modelB, center_refB):
     model_A = extract_ca_coords(model_file, 'A')
     ref_A = extract_ca_coords(backbone_file, 'A')
+
     if model_A.shape[0] < 3 or ref_A.shape[0] < 3:
         return "Too few residues in chain A", None
+
     min_len = min(model_A.shape[0], ref_A.shape[0])
     model_A_centered = model_A[:min_len] - center_modelB
     model_A_rot = model_A_centered @ R + center_refB
+
     rmsd = np.sqrt(np.mean(np.sum((model_A_rot - ref_A[:min_len])**2, axis=1)))
     return rmsd, min_len
 
-def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0, rmsd_threshold=2.0):
+def process_models(af_models, rfdiff_backbones, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(os.path.join(output_dir, "models"), exist_ok=True)
     results = []
+
     for file in os.listdir(af_models):
         if not (file.endswith(".pdb") and "rank_001" in file):
             continue
+
         print(f"\nProcessing: {file}")
         model_path = os.path.join(af_models, file)
         backbone_id = extract_backbone_id_from_filename(file)
         if not backbone_id:
+            print("  Could not extract backbone ID.")
             continue
+
         ref_path = os.path.join(rfdiff_backbones, f"{backbone_id}.pdb")
         if not os.path.exists(ref_path):
+            print(f"  Missing backbone: {ref_path}")
             continue
+
         model_seq, model_coords = extract_sequence_and_coords(model_path, "B")
         ref_seq, ref_coords = extract_sequence_and_coords(ref_path, "B")
+
         align_result = align_by_sequence_and_kabsch(model_seq, model_coords, ref_seq, ref_coords)
         if isinstance(align_result, str):
+            print(f"  Alignment error: {align_result}")
             rmsd, matched_B, matched_A, rmsd_B = None, 0, 0, None
         else:
             R, center_model, center_ref, matched_B, rmsd_B = align_result
             rmsd, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
-        model_pattern = re.search(r"rank_\\d+_alphafold2.*?_seed_\\d+", file)
-        json_file = None
-        if model_pattern:
-            tag = model_pattern.group()
-            json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and tag in f), None)
+
+        model_prefix = file.replace(".pdb", "")
+        json_file = next((f for f in os.listdir(af_models) if model_prefix in f and f.endswith('.json')), None)
+        print(f"  Matching JSON file: {json_file}" if json_file else "  No matching JSON file found.")
         iptm = extract_iptm(os.path.join(af_models, json_file)) if json_file else None
-        avg_plddt = np.mean([float(line[60:66]) for line in open(model_path) if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
-        passed = (rmsd is not None and rmsd < rmsd_threshold and avg_plddt > plddt_threshold)
-        if passed:
-            shutil.copy(model_path, os.path.join(output_dir, "models", file))
+        print(f"  ipTM: {iptm}")
+        print(f"  RMSD (A after B-align): {rmsd}" if isinstance(rmsd, float) else f"  RMSD error")
+        print(f"  RMSD (B alignment): {rmsd_B}" if isinstance(rmsd_B, float) else f"  RMSD B error")
+        print(f"  Matched B residues: {matched_B}, Matched A residues: {matched_A}")
+
         results.append({
-            'backbone_id': backbone_id,
             'file': file,
-            'sequence': model_seq,
-            'rmsd_A': rmsd,
-            'rmsd_B': rmsd_B,
+            'rmsd_A': rmsd if isinstance(rmsd, float) else None,
+            'rmsd_B': rmsd_B if isinstance(rmsd_B, float) else None,
             'iptm': iptm,
-            'plddt': avg_plddt,
             'used_CA_chainA': matched_A,
-            'used_CA_chainB': matched_B,
-            'passed': passed
+            'used_CA_chainB': matched_B
         })
+
     df = pd.DataFrame(results)
-    df.to_csv(os.path.join(output_dir, "multimerTest_all.csv"), index=False)
-    df[df['passed']].to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
-    with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
-        for i, row in df[df['passed']].iterrows():
-            f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
-    print(f"\nSaved all to {output_dir}")
+    df.to_csv(os.path.join(output_dir, "debug_rmsd_output.csv"), index=False)
+    print(f"\nSaved results to {output_dir}/debug_rmsd_output.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--af-models', required=True)
     parser.add_argument('--rfdiff-backbones', required=True)
     parser.add_argument('--output-dir', required=True)
-    parser.add_argument('--plddt-threshold', type=float, default=80.0)
-    parser.add_argument('--rmsd-threshold', type=float, default=2.0)
     args = parser.parse_args()
-    process_models(args.af_models, args.rfdiff_backbones, args.output_dir, args.plddt_threshold, args.rmsd_threshold)
+
+    process_models(args.af_models, args.rfdiff_backbones, args.output_dir)
