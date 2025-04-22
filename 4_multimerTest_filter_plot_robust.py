@@ -86,6 +86,9 @@ def process_multimer_models(af_models, rfdiff_backbones):
     return pd.DataFrame(data)
 
 def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
+    if df.empty or 'plddt' not in df.columns or 'rmsd' not in df.columns:
+        print("Warning: Dataframe is empty or missing required columns.")
+        return pd.DataFrame()
     return df[(df['plddt'] > plddt_threshold) & (df['rmsd'] < rmsd_threshold)]
 
 def evaluate_all_models_for_passing_folders(filtered_df, args, ref_dir, model_dir, output_fasta):
