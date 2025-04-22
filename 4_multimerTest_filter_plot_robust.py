@@ -149,9 +149,9 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
         for i, row in df[df['passed']].iterrows():
             f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
 
-    # Create plot
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
+        print(f"Plotting {len(df_plot)} entries.")
         plt.figure(figsize=(10, 7))
         scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
         plt.xlabel("RMSD (A after B-align)")
