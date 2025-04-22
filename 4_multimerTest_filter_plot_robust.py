@@ -49,40 +49,40 @@ def extract_iptm_score(json_path):
     except:
         return None
 
+def extract_folder_name_from_filename(filename):
+    return filename.split("_unrelaxed")[0]
+
 def process_multimer_models(af_models, rfdiff_backbones):
     data = []
-    for root, dirs, _ in os.walk(af_models):
-        for dir in dirs:
-            folder_name = dir.split('.')[0]
+    for file in os.listdir(af_models):
+        if file.endswith(".pdb") and "rank_001" in file:
+            folder_name = extract_folder_name_from_filename(file)
             ref_pdb_path = os.path.join(rfdiff_backbones, f"{folder_name}.pdb")
             try:
                 ref_coords_B, _, _ = parse_pdb(ref_pdb_path, chain='B')
             except FileNotFoundError:
                 continue
 
-            model_dir = os.path.join(root, dir)
-            for file in os.listdir(model_dir):
-                if file.endswith(".pdb") and "rank_001" in file:
-                    model_path = os.path.join(model_dir, file)
-                    json_path = os.path.join(model_dir, file.replace(".pdb", ".json"))
-                    iptm = extract_iptm_score(json_path)
+            pdb_path = os.path.join(af_models, file)
+            json_path = pdb_path.replace(".pdb", ".json")
+            iptm = extract_iptm_score(json_path)
 
-                    try:
-                        coords_A, plddts_A, seq_A = parse_pdb(model_path, chain='A')
-                        coords_B, _, _ = parse_pdb(model_path, chain='B')
-                    except:
-                        continue
+            try:
+                coords_A, plddts_A, seq_A = parse_pdb(pdb_path, chain='A')
+                coords_B, _, _ = parse_pdb(pdb_path, chain='B')
+            except:
+                continue
 
-                    if coords_B.shape == ref_coords_B.shape and 'G' * 15 not in seq_A:
-                        rmsd = superpose_and_calculate_rmsd(ref_coords_B, coords_B)
-                        data.append({
-                            'folder_name': folder_name,
-                            'file_name': file,
-                            'sequence': seq_A,
-                            'plddt': np.mean(plddts_A),
-                            'rmsd': rmsd,
-                            'iptm': iptm
-                        })
+            if coords_B.shape == ref_coords_B.shape and 'G' * 15 not in seq_A:
+                rmsd = superpose_and_calculate_rmsd(ref_coords_B, coords_B)
+                data.append({
+                    'folder_name': folder_name,
+                    'file_name': file,
+                    'sequence': seq_A,
+                    'plddt': np.mean(plddts_A),
+                    'rmsd': rmsd,
+                    'iptm': iptm
+                })
     df = pd.DataFrame(data)
     print("Processed dataframe with", len(df), "entries.")
     return df
@@ -95,6 +95,7 @@ def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
 
 def evaluate_all_models_for_passing_folders(filtered_df, args, ref_dir, model_dir, output_fasta):
     all_passed = []
+    all_files = os.listdir(args.af_models)
     for folder in filtered_df['folder_name'].unique():
         ref_path = os.path.join(ref_dir, f"{folder}.pdb")
         try:
@@ -102,34 +103,34 @@ def evaluate_all_models_for_passing_folders(filtered_df, args, ref_dir, model_di
         except:
             continue
 
-        full_folder_path = os.path.join(args.af_models, folder)
-        for file in os.listdir(full_folder_path):
-            if file.endswith(".pdb"):
-                model_path = os.path.join(full_folder_path, file)
-                json_path = model_path.replace(".pdb", ".json")
-                iptm = extract_iptm_score(json_path)
+        for file in all_files:
+            if not file.endswith(".pdb") or folder not in file:
+                continue
+            model_path = os.path.join(args.af_models, file)
+            json_path = model_path.replace(".pdb", ".json")
+            iptm = extract_iptm_score(json_path)
 
-                try:
-                    coords_A, plddts_A, seq_A = parse_pdb(model_path, chain='A')
-                    coords_B, _, _ = parse_pdb(model_path, chain='B')
-                except:
-                    continue
+            try:
+                coords_A, plddts_A, seq_A = parse_pdb(model_path, chain='A')
+                coords_B, _, _ = parse_pdb(model_path, chain='B')
+            except:
+                continue
 
-                if coords_B.shape == ref_coords_B.shape and 'G' * 15 not in seq_A:
-                    rmsd = superpose_and_calculate_rmsd(ref_coords_B, coords_B)
-                    plddt = np.mean(plddts_A)
-                    if plddt > args.plddt_threshold and rmsd < args.rmsd_threshold:
-                        all_passed.append({
-                            'folder_name': folder,
-                            'file_name': file,
-                            'sequence': seq_A,
-                            'plddt': plddt,
-                            'rmsd': rmsd,
-                            'iptm': iptm
-                        })
-                        dst = os.path.join(model_dir, f"{folder}_{file}")
-                        if os.path.isfile(model_path):
-                            shutil.copy(model_path, dst)
+            if coords_B.shape == ref_coords_B.shape and 'G' * 15 not in seq_A:
+                rmsd = superpose_and_calculate_rmsd(ref_coords_B, coords_B)
+                plddt = np.mean(plddts_A)
+                if plddt > args.plddt_threshold and rmsd < args.rmsd_threshold:
+                    all_passed.append({
+                        'folder_name': folder,
+                        'file_name': file,
+                        'sequence': seq_A,
+                        'plddt': plddt,
+                        'rmsd': rmsd,
+                        'iptm': iptm
+                    })
+                    dst = os.path.join(model_dir, f"{folder}_{file}")
+                    if os.path.isfile(model_path):
+                        shutil.copy(model_path, dst)
 
     passed_df = pd.DataFrame(all_passed)
     passed_df.to_csv(os.path.join(args.output_dir, "all_passed_models.csv"), index=False)
@@ -205,9 +206,9 @@ def main(args):
 if __name__ == "__main__":
     print("=== Starting multimer foldability test script ===")
     parser = argparse.ArgumentParser()
-    parser.add_argument('--af-models', required=True, help='Path to AF2 model folders')
-    parser.add_argument('--rfdiff-backbones', required=True, help='Path to backbone reference PDBs')
-    parser.add_argument('--output-dir', required=True, help='Output directory to store all results')
+    parser.add_argument('--af-models', required=True, help='Path to AF2 model folder (flat structure, no subfolders)')
+    parser.add_argument('--rfdiff-backbones', required=True, help='Path to reference PDBs with target backbone')
+    parser.add_argument('--output-dir', required=True, help='Output directory for filtered models, plots, and FASTA')
     parser.add_argument('--plddt_threshold', type=float, default=90.0)
     parser.add_argument('--rmsd_threshold', type=float, default=2.0)
     args = parser.parse_args()
