@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 from Bio.Align import PairwiseAligner
+import matplotlib.pyplot as plt
 
 three_to_one = {
     'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
@@ -147,6 +148,20 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
     with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
         for i, row in df[df['passed']].iterrows():
             f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
+
+    # Create plot
+    df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
+    if not df_plot.empty:
+        plt.figure(figsize=(10, 7))
+        scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
+        plt.xlabel("RMSD (A after B-align)")
+        plt.ylabel("pLDDT (Chain A)")
+        plt.title("Foldability Test: RMSD vs pLDDT (Colored by ipTM)")
+        cbar = plt.colorbar(scatter)
+        cbar.set_label("ipTM Score")
+        plt.grid(True)
+        plt.savefig(os.path.join(output_dir, "multimerTest_plot_rmsd_plddt_ipTM.png"), dpi=300, bbox_inches='tight')
+
     print(f"\nSaved all to {output_dir}")
 
 if __name__ == "__main__":
