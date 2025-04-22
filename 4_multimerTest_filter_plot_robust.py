@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import argparse
 import shutil
 import json
+import re
 
 three_to_one = {
     'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
@@ -49,18 +50,19 @@ def extract_iptm_score(json_path):
     except:
         return None
 
-def extract_folder_name_from_filename(filename):
-    return filename.split("_unrelaxed")[0]
+def extract_backbone_id_from_filename(filename):
+    match = re.search(r"__([0-9]+)_", filename)
+    return f"_{match.group(1)}" if match else None
 
 def process_multimer_models(af_models, rfdiff_backbones):
     data = []
     for file in os.listdir(af_models):
         if file.endswith(".pdb") and "rank_001" in file:
-            folder_name = extract_folder_name_from_filename(file)
-            ref_pdb_path = os.path.join(rfdiff_backbones, f"{folder_name}.pdb")
-            try:
-                ref_coords_B, _, _ = parse_pdb(ref_pdb_path, chain='B')
-            except FileNotFoundError:
+            backbone_id = extract_backbone_id_from_filename(file)
+            if backbone_id is None:
+                continue
+            ref_pdb_path = os.path.join(rfdiff_backbones, f"{backbone_id}.pdb")
+            if not os.path.exists(ref_pdb_path):
                 continue
 
             pdb_path = os.path.join(af_models, file)
@@ -73,10 +75,15 @@ def process_multimer_models(af_models, rfdiff_backbones):
             except:
                 continue
 
+            try:
+                ref_coords_B, _, _ = parse_pdb(ref_pdb_path, chain='B')
+            except:
+                continue
+
             if coords_B.shape == ref_coords_B.shape and 'G' * 15 not in seq_A:
                 rmsd = superpose_and_calculate_rmsd(ref_coords_B, coords_B)
                 data.append({
-                    'folder_name': folder_name,
+                    'folder_name': backbone_id,
                     'file_name': file,
                     'sequence': seq_A,
                     'plddt': np.mean(plddts_A),
@@ -96,15 +103,15 @@ def filter_surpassing_thresholds(df, plddt_threshold, rmsd_threshold):
 def evaluate_all_models_for_passing_folders(filtered_df, args, ref_dir, model_dir, output_fasta):
     all_passed = []
     all_files = os.listdir(args.af_models)
-    for folder in filtered_df['folder_name'].unique():
-        ref_path = os.path.join(ref_dir, f"{folder}.pdb")
+    for backbone_id in filtered_df['folder_name'].unique():
+        ref_path = os.path.join(ref_dir, f"{backbone_id}.pdb")
         try:
             ref_coords_B, _, _ = parse_pdb(ref_path, chain='B')
         except:
             continue
 
         for file in all_files:
-            if not file.endswith(".pdb") or folder not in file:
+            if not file.endswith(".pdb") or backbone_id not in file:
                 continue
             model_path = os.path.join(args.af_models, file)
             json_path = model_path.replace(".pdb", ".json")
@@ -121,14 +128,14 @@ def evaluate_all_models_for_passing_folders(filtered_df, args, ref_dir, model_di
                 plddt = np.mean(plddts_A)
                 if plddt > args.plddt_threshold and rmsd < args.rmsd_threshold:
                     all_passed.append({
-                        'folder_name': folder,
+                        'folder_name': backbone_id,
                         'file_name': file,
                         'sequence': seq_A,
                         'plddt': plddt,
                         'rmsd': rmsd,
                         'iptm': iptm
                     })
-                    dst = os.path.join(model_dir, f"{folder}_{file}")
+                    dst = os.path.join(model_dir, f"{backbone_id}_{file}")
                     if os.path.isfile(model_path):
                         shutil.copy(model_path, dst)
 
@@ -207,7 +214,7 @@ if __name__ == "__main__":
     print("=== Starting multimer foldability test script ===")
     parser = argparse.ArgumentParser()
     parser.add_argument('--af-models', required=True, help='Path to AF2 model folder (flat structure, no subfolders)')
-    parser.add_argument('--rfdiff-backbones', required=True, help='Path to reference PDBs with target backbone')
+    parser.add_argument('--rfdiff-backbones', required=True, help='Path to reference PDBs with target backbone named _<id>.pdb')
     parser.add_argument('--output-dir', required=True, help='Output directory for filtered models, plots, and FASTA')
     parser.add_argument('--plddt_threshold', type=float, default=90.0)
     parser.add_argument('--rmsd_threshold', type=float, default=2.0)
