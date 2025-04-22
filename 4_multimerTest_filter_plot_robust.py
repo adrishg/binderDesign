@@ -153,8 +153,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
 
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
-        print(f"Plotting {len(df_plot)} entries.")
         try:
+            print(f"Generating plot for {len(df_plot)} models...")
             plt.figure(figsize=(10, 7))
             scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], c=df_plot['iptm'], cmap='viridis', alpha=0.8)
             plt.xlabel("RMSD (A after B-align)")
@@ -172,6 +172,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
             print(f"Saved plot to {plot_path}")
         except Exception as e:
             print(f"Failed to generate/save plot: {e}")
+    else:
+        print("Plotting skipped: no valid entries.")
 
     print(f"\nSaved all to {output_dir}")
 
