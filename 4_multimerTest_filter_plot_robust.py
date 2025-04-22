@@ -29,21 +29,16 @@ def extract_iptm(json_path):
     try:
         with open(json_path, 'r') as f:
             data = json.load(f)
-            print(f"  Loaded JSON keys: {list(data.keys())}")
-            iptm = data.get("ranking_confidences", {}).get("iptm")
-            if iptm is not None:
-                print("  Found iptm in ranking_confidences")
-                return iptm
-            iptm_flat = data.get("iptm")
-            if isinstance(iptm_flat, float):
-                print("  Found flat iptm")
-                return iptm_flat
-            iptm_dict = data.get("metrics", {}).get("iptm")
-            if isinstance(iptm_dict, dict):
-                print("  Found iptm under metrics")
-                return iptm_dict.get("score")
-            print("  ipTM not found in any expected format")
-            return None
+        iptm = data.get("ranking_confidences", {}).get("iptm")
+        if iptm is not None:
+            return iptm
+        iptm_flat = data.get("iptm")
+        if isinstance(iptm_flat, float):
+            return iptm_flat
+        iptm_dict = data.get("metrics", {}).get("iptm")
+        if isinstance(iptm_dict, dict):
+            return iptm_dict.get("score")
+        return None
     except Exception as e:
         print(f"  Failed to parse JSON: {e}")
         return None
@@ -130,11 +125,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
         else:
             R, center_model, center_ref, matched_B, rmsd_B = align_result
             rmsd, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
-        model_pattern = re.search(r"rank_\\d+_alphafold2.*?_seed_\\d+", file)
-        json_file = None
-        if model_pattern:
-            tag = model_pattern.group()
-            json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and tag in f), None)
+        base_prefix = file.replace("unrelaxed", "scores").replace(".pdb", "")
+        json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and f.startswith(base_prefix)), None)
         print(f"  Matching JSON file: {json_file}" if json_file else "  No matching JSON file found.")
         iptm = extract_iptm(os.path.join(af_models, json_file)) if json_file else None
         print(f"  ipTM: {iptm}")
