@@ -6,20 +6,29 @@
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END           # Mail at end of run
 
+
+#############################################################################################
+######## This version assumes no visual inspection for backbones, only RoG applied ########## 
+#############################################################################################
+
 # Receives project_name, pdb_target, hotspots, ...
 
-##Test username github jeje
-
 #Example Cav2.2_AID
+# Data needed for backbone generation
 project_name="testPipeline_Cav22_AID"
 project_path="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-Pipeline/"
 pdb_target="/share/yarovlab/ahgz/Binders-Review/Cav22_AID_site/Test-1/inputs/7miy_truncated.pdb"
 contig_map="[A332-406/0 A464-786/0 60-100]"
 hotspots="[A381,A384,A385,A388,A389,A391,A392]"
-number_models=100
+number_models=10000
 
 #Default ROG for potentials RFDiff
 rog_value=5
+
+# Data needed for 
+target_seq="KPFEIIILLTIFANCVALAIYIPFPEDDSNATNSNLERVEYLFLIIFTVEAFLKVIAYGLLFHPNAYLRNGWNLLDFIIVVVGLFSAILEQATKADGANALGGKGAGFDVKALRAFRVLRPLRLVSGVPSLQVVLNSIIKAMVPLLHIALLVLFVIIIYAIIGLELFMGKMHKTCYNQEGIADVPAEDDPSPCALETGHGRQCQNGTVCKPGWDGPKHGITNFDNFAFAMLTVFQCITMEGWTDVLYWVNDAVGRDWPWIYFVTLIIIGSFFVLNLVLGVLSGEFSKEREKAKARGDFQKLREKQQLEEDLKGYLDWITQAEDIDPENEDEGMDEEKPRNMSMPTSETESVNTENVAGGDIEGENCGARLAHRISKSKFSRYWRRWNRFCRRKCRAAVKSNVFYWLVIFLVFLNTLTIASEHYNQPNWLTEVQDTANKALLALFTAEMLLKMYSLGLQAYFVSLFNRFDCFVVCGGILETILVETKIMSPLGISVLRCVRLLRIFKITRYWNSLSNLVASLLNSVRSIASLLLLLFLFIIIFSLLGMQLFGGKFNFDEMQTRRSTFDNFPQSLLTVFQILTGEDWNSVMYDGIMAYGGPSFPGMLVCIYFIILFICGNYILLNVFLAIAVDNLADAESLTSAQKEEEEEKERKKLARTASPEKKQELVEKPAVGESKEEKIELKSITADGESPPATKINMDDLQPNENEDKSPYPNPETTGEEDEEEPEMPVGPRPRPLSELHLKEKAVPMPEASAFFIFSSNNRFRLQCHRIVNDTIFTNLILFFILLSSISLAAEDPVQHTSFRNHILFYFDIVFTTIFTIEIALKILGNADYVFTSIFTLEIILKMTAYGAFLHKGSFCRNYFNILDLLVVSVSLISFGIQSSAINVVKILRVLRVLRPLRAINRAKGLKHVVQCVFVAIRTIGNIVIVTTLLQFMFACIGVQLFKGKLYTCSDSSKQTEAECKGNYITYKDGEVDHPIIQPRSWENSKFDFDNVLAAMMALFTVSTFEGWPELLYRSIDSHTEDKGPIYNYRVEISIFFIIYIIIIAFFMMNIFVGFVIVTFQEQGEQEYKNCELDKNQRQCVEYALKARPLRRYIPKNQHQYKVWYVVNSTYFEYLMFVLILLNTICLAMQHYGQSCLFKIAMNILNMLFTGLFTVEMILKLIAFKPKGYFSDPWNVFDFLIVIGSIIDVILSETNHYFCDAWNTFDALIVVGSIVDIAITEVNPAEHTQCSPSMNAEENSRISITFFRLFRVMRLVKLLSRGEGIRTLLWTFIKSFQALPYVALLIVMLFFIYAVIGMQVFGKIALNDTTEINRNNNFQTFPQAVLLLFRCATGEAWQDIMLACMPGKKCAPESEPSNSTEGETPCGSSFAVFYFISFYMLCAFLIINLFVAVIMDN"
+
+
 
 source /share/yarovlab/ahgz/.bashrc
 conda activate base
@@ -63,7 +72,7 @@ python /share/yarovlab/ahgz/scripts/binderDesign/1_6_filter_Compactness.py \
 
 # Filter 2: in this case to make the C and N terminus to be in the same side and far from the interacting region between A and B, padding and tolerance might need fine tuning
 python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.py \
-    -d "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" \
+    -d "$project_path/1.5-FilteringBackbones/output/filtered_RoG/" \
     -p 10.0 \
     -t 60.0 \
     -c 5.0 \
@@ -83,35 +92,55 @@ python /share/yarovlab/ahgz/scripts/binderDesign/1_5_filter_NCterminus_de_novo.p
 
 # Step 2 v2: Sequence Design with Ligand MPNN
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_ligandMPNN_de_novo.sh \
-#    -f "$project_path/1.5-FilteringBackbones/output/filtered_compactness/" \
-#    -o "$project_path/2-SequenceDesign/" \
-#    -c 'A'
+    -f "$project_path/1.5-FilteringBackbones/output/filtered_RoG/" \
+    -o "$project_path/2-SequenceDesign/" \
+    -c 'A'
+
+echo "Sequence design completed for project: $project_name"
 
 # Step 3: Foldability Test of binder only
 # Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2.sh \
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2_monomer.sh \
     -s "$project_path/2-SequenceDesign/seqs/" \
     -a "$project_name" \
     -o "$project_path/3-FoldabilityTest/output/"
 
-# Part 2: Foldability Test Filtering and Plotting
-# Run final Python script to generate plots and summary
-#Plot the results by pLDDT and RMSD, returns summary with list of design squences that have pLDDT > 95 and RMSD < 1.5 A and scatterplot png
+echo "Foldability test monomer completed for project: $project_name"
+
 conda activate base
+mkdir -p "$project_path"/3-FoldabilityTest/output_results/
 
+#Filtering monomer foldability test
+python /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_filter_plot_robust.py \
+    --af-models "$project_path/3-FoldabilityTest/output/" \
+    --rfdiff-backbones "$project_path/1.5-FilteringBackbones/output/visually_inspected/" \
+    --output-dir "$project_path/3-FoldabilityTest/output_results/" \
+    --plddt_threshold 95\
+    --rmsd_threshold 2
 
-#Step 3.5: Filtering by solubility here before going to AFmultimer
+echo "Foldability test filtering completed for project: $project_name"
 
-#python /share/yarovlab/ahgz/scripts/binderDesign/3-FoldabilityTest_plot_filter.py --folder_of_folders "$project_path/3-FoldabilityTest/output/" --reference_folder "$project_path/1-BackboneDesign/output" --output_csv "output.csv" --filtered_output_csv "filtered_output.csv" --summary_file "summary_foldabilityTest.txt" --plot_file "output_directory/pldds_vs_rmsd_plot.png" --plddt_threshold 95 --rmsd_threshold 2
+mkdir -p "$project_path"/4-MultimerTest/
+mkdir -p "$project_path"/4-MultimerTest/output
 
-#Step 4: AF multimer and Docking(?) step
-#Part 1: Actually executing multimer job
-#should we add -r for reference to only run multimer in those who passed the monomer foldability test?
-sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/4_multimerTest.sh \
-    -s "$project_path/2-SequenceDesign/seqs/" \
-    -o "$project_path/3-FoldabilityTest/output/"
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/4_foldabilityTest_runAF2_multimer.sh \
+  --fasta_file "$project_path/3-FoldabilityTest/output_results/filtered_passed_seqs.fasta" \
+  --output_path "$project_path/4-MultimerTest/output/" \
+  --target_sequence $target_seq \
+  --template_pdb "$project_path/templates/"
 
-#Part 2: Different plot? since we cared about pae here?
-conda activate base
+echo "Foldability test multimer completed for project: $project_name"
 
+output_dir="${project_path}/4-MultimerTest/output_results/"
+# Create output directory if it doesn't exist
+mkdir -p "$output_dir"
 
+# Run foldability test
+python /share/yarovlab/ahgz/scripts/binderDesign/4_multimerTest_filter_plot_robust.py \
+    --af-models "${project_path}/4-MultimerTest/output/" \
+    --rfdiff-backbones "${project_path}/1.5-FilteringBackbones/output/visually_inspected" \
+    --output-dir "$output_dir" \
+    --plddt-threshold 90.0 \
+    --rmsd-threshold 2.0
+
+echo "Foldability test multimer filtering completed for project: $project_name"

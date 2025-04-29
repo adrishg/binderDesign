@@ -122,8 +122,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
         else:
             R, center_model, center_ref, matched_B, rmsd_B = align_result
             rmsd, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
-        base_prefix = file.replace("unrelaxed", "scores").replace(".pdb", "")
-        json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and base_prefix in f), None)
+        tag_pattern = re.sub("unrelaxed", "scores", file).replace(".pdb", "")
+        json_file = next((f for f in os.listdir(af_models) if f.endswith('.json') and tag_pattern in f), None)
         iptm = extract_iptm(os.path.join(af_models, json_file)) if json_file else None
         avg_plddt = np.mean([float(line[60:66]) for line in open(model_path) if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
         passed = (rmsd is not None and rmsd < rmsd_threshold and avg_plddt > plddt_threshold)
@@ -161,9 +161,13 @@ def process_models(af_models, rfdiff_backbones, output_dir, plddt_threshold=80.0
             plt.title(f"Foldability Test: RMSD vs pLDDT (Colored by ipTM)\n{passed_count}/{total_count} passed ({pct_passed:.1f}%)")
             cbar = plt.colorbar(scatter)
             cbar.set_label("ipTM Score")
-            plt.axhline(y=plddt_threshold, color='red', linestyle='--', label=f'pLDDT > {plddt_threshold}')
-            plt.axvline(x=rmsd_threshold, color='blue', linestyle='--', label=f'RMSD < {rmsd_threshold}')
-            plt.legend()
+            plt.axhline(y=plddt_threshold, color='red', linestyle='--')
+            plt.axvline(x=rmsd_threshold, color='blue', linestyle='--')
+            plt.legend([
+                f'pLDDT > {plddt_threshold}',
+                f'RMSD < {rmsd_threshold}',
+                f'Passed: {passed_count}/{total_count} ({pct_passed:.1f}%)'
+            ])
             plt.grid(True)
             plot_path = os.path.join(output_dir, "multimerTest_plot_rmsd_plddt_ipTM.png")
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
