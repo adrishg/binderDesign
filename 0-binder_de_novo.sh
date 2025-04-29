@@ -41,7 +41,7 @@ module load gcc/13.2.0
 # Set up project directory structure
 
 #project_path="./$project_name"
-mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesign,3-FoldabilityTest,results}
+mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesign,3-FoldabilityTest,4-MultimerTest,5-Docking,results}
 
 # Step 1: Backbone DesignBackbone Design
 # --wait falg is neccessary in order to let the job end until starts the next step
