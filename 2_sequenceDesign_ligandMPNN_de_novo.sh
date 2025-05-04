@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p gpu-vladimir     # Partition name
 #SBATCH --gres=gpu:1        # Request 1 GPUs
-#SBATCH -t 1-12:00:00       # 1 day just in case
+#SBATCH -t 2-12:00:00       # 1 day just in case
 #SBATCH --job-name=seqDesign # Job name
 #SBATCH --mem=125G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run

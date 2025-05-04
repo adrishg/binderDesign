@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p gpu-vladimir           # Partition name
 #SBATCH --gres=gpu:1              # Request 2 GPUs
-#SBATCH -t 7-12:00:00            # 10 days just in case
+#SBATCH -t 10-12:00:00            # 10 days just in case
 #SBATCH --job-name=foldabilityTest # Job name
 #SBATCH --mem=125G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
@@ -65,4 +65,3 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
     # Run colabfold_batch on the modified FASTA file
     colabfold_batch --msa-mode single_sequence --num-recycle 5 --num-seed 3 "$temp_fasta" "$output_dir"
 done
-

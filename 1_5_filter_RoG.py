@@ -6,6 +6,9 @@ import numpy as np
 import shutil
 #import freesasa
 from scipy.spatial import ConvexHull
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
 
 def parse_pdb(filename):
     with open(filename, 'r') as file:
@@ -47,31 +50,17 @@ def calculate_volume(residues):
     hull = ConvexHull(coords)
     return hull.volume
 
-#Surface area works in personal computer, but in barbera so far i will need to create new environment to run this part, for now commenting
-#def calculate_surface_area(pdb_file):
-#    structure = freesasa.Structure(pdb_file)
-#    result = freesasa.calc(structure)
-#    return result.totalArea()
-
-#def calculate_sphericity(volume, surface_area):
-#    if surface_area == 0:
-#        return 0
-#    return (math.pi ** (1/3) * (6 * volume) ** (2/3)) / surface_area
-
 def calculate_compactness_metrics(pdb_file, chain='A'):
     try:
         atoms = parse_pdb(pdb_file)
         residues = get_residue_atoms(atoms, chain=chain)
 
-        # Raise an exception if no residues are found
         if not residues:
-            raise ValueError("No residues found for chain {} in {}.".format(chain, pdb_file))
+            raise ValueError(f"No residues found for chain {chain} in {pdb_file}.")
 
         mass_center = calculate_mass_center(residues)
         rg = calculate_radius_of_gyration(residues, mass_center)
         volume = calculate_volume(residues)
-        #surface_area = calculate_surface_area(pdb_file)
-        #sphericity = calculate_sphericity(volume, surface_area)
 
         return {
             'PDB': pdb_file,
@@ -79,68 +68,82 @@ def calculate_compactness_metrics(pdb_file, chain='A'):
             'Mass_Center': mass_center,
             'Radius_of_Gyration': rg,
             'Volume': volume,
-            #'Surface_Area': surface_area,
-            #'Sphericity': sphericity
         }
 
     except ValueError as e:
-        # Print error message and skip the file
         print(e)
         return
-
 
 def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=15.0):
     results = []
     pdb_files = [f for f in os.listdir(pdb_directory) if f.endswith('.pdb')]
 
     if not pdb_files:
-        raise ValueError(f"No PDB files found in the directory: {os.path.abspath(pdb_directory)}")
+        raise ValueError(f"No PDB files found in {os.path.abspath(pdb_directory)}")
 
     filtered_pdb_files = []
 
     for pdb_file in pdb_files:
-        pdb_file_path = os.path.join(pdb_directory, pdb_file)
-        print(f"Processing {pdb_file_path}...")
-        result = calculate_compactness_metrics(pdb_file_path, chain=chain)
+        pdb_path = os.path.join(pdb_directory, pdb_file)
+        print(f"Processing {pdb_path}...")
+        result = calculate_compactness_metrics(pdb_path, chain=chain)
         if result:
             results.append(result)
             if result['Radius_of_Gyration'] <= rg_cutoff:
                 filtered_pdb_files.append(pdb_file)
 
-
     # Save results to CSV
     results_df = pd.DataFrame(results)
     os.makedirs(output_dir, exist_ok=True)
-    results_csv_path = os.path.join(output_dir, "compactness_results.csv")
-    results_df.to_csv(results_csv_path, index=False)
-    print("Results saved to {}".format(results_csv_path))
+    results_csv = os.path.join(output_dir, "rog_results.csv")
+    results_df.to_csv(results_csv, index=False)
+    print(f"Results saved to {results_csv}")
 
-    # Move filtered PDB files to output/filtered_compactness
-    filtered_dir = os.path.join(output_dir, "filtered_compactness")
+    # Move filtered PDBs
+    filtered_dir = os.path.join(output_dir, "filtered_rog")
     os.makedirs(filtered_dir, exist_ok=True)
-
     for pdb_file in filtered_pdb_files:
-        src_path = os.path.join(pdb_directory, pdb_file)
-        dst_path = os.path.join(filtered_dir, pdb_file)
-        shutil.copy(src_path, dst_path)
+        src = os.path.join(pdb_directory, pdb_file)
+        dst = os.path.join(filtered_dir, pdb_file)
+        shutil.copy(src, dst)
+    print(f"Filtered PDBs copied to {filtered_dir}")
 
-    print("Filtered PDB files copied to {}".format(filtered_dir))
+    # Generate Histogram
+    try:
+        results_df['Radius_of_Gyration'] = pd.to_numeric(results_df['Radius_of_Gyration'], errors='coerce')
+        results_df = results_df.dropna(subset=['Radius_of_Gyration'])
+        if results_df.empty:
+            print("No data available for histogram.")
+            return
 
-# Usage
+        rog_values = results_df['Radius_of_Gyration'].values
+        bins = 30
+        counts, bin_edges = np.histogram(rog_values, bins=bins)
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
 
-if __name__ == "__main__":
+        norm = plt.Normalize(min(bin_centers), max(bin_centers))
+        colors = plt.cm.viridis(norm(bin_centers))
 
-    parser = argparse.ArgumentParser(description="Filter PDB files based on compactness using Radius of Gyration.")
-    parser.add_argument("-d", "--directory", required=True, help="Directory containing PDB files")
-    parser.add_argument("-c", "--chain", default='A', help="Chain identifier to analyze (default: A)")
-    parser.add_argument("-o", "--output", default='output', help="Output directory for results")
-    parser.add_argument("--rg_cutoff", type=float, default=15.0, help="Radius of Gyration cutoff for filtering (default: 15.0)")
-    args = parser.parse_args()
+        fig, ax = plt.subplots(figsize=(8, 5))
+        for i in range(len(bin_centers)):
+            ax.bar(bin_centers[i], counts[i], width=bin_edges[1]-bin_edges[0], 
+                   color=colors[i], edgecolor='black')
 
-    pdb_directory = args.directory
+        ax.axvline(rg_cutoff, color='red', linestyle='--', linewidth=2)
+        under = (rog_values < rg_cutoff).sum()
+        percent = 100 * under / len(rog_values)
 
-    chain = args.chain
-    output_dir = args.output
-    rg_cutoff = args.rg_cutoff
+        ax.legend([f'Threshold: {rg_cutoff} Å\n{under} under ({percent:.1f}%)'], loc='upper right')
+        ax.set_xlabel('Radius of Gyration (Å)')
+        ax.set_ylabel('Frequency')
+        ax.set_title(f'Radius of Gyration Distribution (Chain {chain})')
+        ax.grid(True, linestyle='--', alpha=0.6)
 
-    main(pdb_directory, chain, output_dir, rg_cutoff)
+        plot_path = os.path.join(output_dir, "rog_histogram.png")
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        plt.close()
+        print(f"Histogram saved to {plot_path}")
+
+    except Exception as e:
+        print(f"Error generating histogra
