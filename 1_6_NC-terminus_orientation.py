@@ -197,4 +197,33 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="PDB Filter
+        description="PDB Filter with Advanced Interface Residue Handling",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    
+    parser.add_argument("--input-dir", required=True,
+                        help="Directory containing input PDB files")
+    parser.add_argument("--output-dir", default="filtered_results",
+                        help="Output directory for results")
+    parser.add_argument("--binder-chain", default="A",
+                        help="Chain identifier for binder molecules")
+    parser.add_argument("--target-chain", default="B",
+                        help="Chain identifier for target molecules")
+    parser.add_argument("--interface-residues", type=str,
+                        help="Interface residues in format [start-end,single,...] e.g. [355-378,455,467-472]")
+    parser.add_argument("--min-initial-dist", type=float, default=12.0,
+                        help="Minimum initial distance for BOTH termini (Å)")
+    parser.add_argument("--max-angle", type=float, default=90.0,
+                        help="Maximum allowed angle from target direction (0-90°)")
+    parser.add_argument("--min-elong-dist", type=float, default=10.0,
+                        help="Minimum distance after elongation for BOTH termini (Å)")
+    
+    args = parser.parse_args()
+    
+    print("Running with parameters:")
+    print(f"Interface residues: {args.interface_residues or 'All target residues'}")
+    print(f"Initial distance: >{args.min_initial_dist}Å")
+    print(f"Max angle: ≤{args.max_angle}°")
+    print(f"Elongation distance: >{args.min_elong_dist}Å")
+    
+    main(args)

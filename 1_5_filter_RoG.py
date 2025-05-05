@@ -146,4 +146,14 @@ def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=15.0):
         print(f"Histogram saved to {plot_path}")
 
     except Exception as e:
-        print(f"Error generating histogra
+        print(f"Error generating histogram: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Analyze PDB compactness and filter based on Radius of Gyration.")
+    parser.add_argument("-d", "--input-dir", required=True, help="Directory with PDB files")
+    parser.add_argument("-c", "--chain", default='A', help="Chain identifier (default: A)")
+    parser.add_argument("-o", "--output-dir", default='output', help="Output directory")
+    parser.add_argument("--rg_cutoff", type=float, default=15.0, help="RoG cutoff (default: 15.0)")
+    args = parser.parse_args()
+
+    main(args.directory, args.chain, args.output, args.rg_cutoff)
