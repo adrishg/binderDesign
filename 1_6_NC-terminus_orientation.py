@@ -222,8 +222,8 @@ if __name__ == "__main__":
     
     print("Running with parameters:")
     print(f"Interface residues: {args.interface_residues or 'All target residues'}")
-    print(f"Initial distance: >{args.min_initial_dist}Å")
-    print(f"Max angle: ≤{args.max_angle}°")
-    print(f"Elongation distance: >{args.min_elong_dist}Å")
+    print(f"Initial distance: >{args.min_initial_dist}")
+    print(f"Max angle: ≤{args.max_angle}")
+    print(f"Elongation distance: >{args.min_elong_dist}")
     
     main(args)
