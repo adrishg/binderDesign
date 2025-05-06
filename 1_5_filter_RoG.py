@@ -149,11 +149,19 @@ def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=15.0):
         print(f"Error generating histogram: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Analyze PDB compactness and filter based on Radius of Gyration.")
-    parser.add_argument("-d", "--input-dir", required=True, help="Directory with PDB files")
+    parser = argparse.ArgumentParser(description="Analyze PDB compactness.")
+    # Updated flags with clearer names
+    parser.add_argument("-i", "--input-dir", required=True, help="Directory containing PDB files")
+    parser.add_argument("-o", "--output-dir", default='output', help="Output directory for results")
     parser.add_argument("-c", "--chain", default='A', help="Chain identifier (default: A)")
-    parser.add_argument("-o", "--output-dir", default='output', help="Output directory")
-    parser.add_argument("--rg_cutoff", type=float, default=15.0, help="RoG cutoff (default: 15.0)")
+    parser.add_argument("--rg-cutoff", type=float, default=15.0, help="Radius of Gyration cutoff (default: 15.0)")
+    
     args = parser.parse_args()
 
-    main(args.directory, args.chain, args.output, args.rg_cutoff)
+    # Pass the new argument names to main()
+    main(
+        pdb_directory=args.input_dir, 
+        chain=args.chain, 
+        output_dir=args.output_dir, 
+        rg_cutoff=args.rg_cutoff
+    )
