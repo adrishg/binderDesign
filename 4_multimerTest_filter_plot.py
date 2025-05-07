@@ -1,14 +1,17 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
+import re
 import numpy as np
 import pandas as pd
 import argparse
 import json
-import re
 import shutil
 from Bio.Align import PairwiseAligner
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 
 three_to_one = {
     'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
@@ -115,13 +118,17 @@ def transform_and_rmsd_chainA(model_file, backbone_file, R, center_modelB, cente
     return rmsd, min_len
 
 def process_models(af_models, rfdiff_backbones, output_dir, project_name,
-                   plddt_threshold=80.0, rmsd_threshold=2.0, rmsd_B_threshold=3.0):
+                    plddt_threshold=80.0, rmsd_threshold=2.0, rmsd_B_threshold=3.0,
+                    robust=False, min_passed=1, iptm_threshold = 0.6):
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(os.path.join(output_dir, "models"), exist_ok=True)
+    model_dir = os.path.join(output_dir, "models")
+    os.makedirs(model_dir, exist_ok=True)
     results = []
     
     for file in os.listdir(af_models):
-        if not (file.endswith(".pdb") and "rank_001" in file):
+        if not file.endswith(".pdb"):
+            continue
+        if not robust and "rank_001" not in file:
             continue
         print(f"\nProcessing: {file}")
         model_path = os.path.join(af_models, file)
@@ -170,12 +177,10 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         iptm = extract_iptm(json_path)
         
         avg_plddt = np.mean([float(line[60:66]) for line in open(model_path) 
-                           if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
+                            if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
         
-        passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold)
-        if passed:
-            shutil.copy(model_path, os.path.join(output_dir, "models", file))
-            
+        passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold and iptm > iptm_threshold)
+        
         results.append({
             'backbone_id': backbone_id,
             'file': file,
@@ -191,18 +196,42 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
     
     df = pd.DataFrame(results)
     df.to_csv(os.path.join(output_dir, "multimerTest_all.csv"), index=False)
-    df[df['passed']].to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+
+    # Filter based on robust setting
+    if robust:
+        # Calculate sequence-level statistics
+        sequence_stats = df.groupby(['backbone_id']).agg(
+            total_models=('passed', 'size'),
+            passed_models=('passed', 'sum')
+        ).reset_index()
+
+        # Filter backbones that meet the minimum passed threshold
+        passed_backbones = sequence_stats[sequence_stats['passed_models'] >= min_passed]
+        
+        if not passed_backbones.empty:
+            filtered_df = df[df['backbone_id'].isin(passed_backbones['backbone_id'])]
+            filtered_df = filtered_df[filtered_df['passed']]
+            filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+        else:
+            filtered_df = pd.DataFrame()  # Create an empty DataFrame
+            filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+
+    else:
+        filtered_df = df[df['passed']]
+        filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
     
     with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
-        for _, row in df[df['passed']].iterrows():
+        for _, row in filtered_df.iterrows():
             f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
     
     # Enhanced plotting
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
         plt.figure(figsize=(10, 7))
-        scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'], 
-                            c=df_plot['iptm'], cmap='viridis', 
+        
+        # Use magma colormap
+        scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'],
+                            c=df_plot['iptm'], cmap='magma',
                             alpha=0.8, edgecolors='w', linewidth=0.5)
         
         # Add threshold lines
@@ -212,21 +241,43 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         # Formatting
         plt.xlabel("RMSD of Binder (Å)", fontsize=12)
         plt.ylabel("pLDDT of Binder", fontsize=12)
-        plt.title(f"Multimer Test: {project_name}\n"
-                 f"Passed: {df['passed'].sum()}/{len(df)} ({df['passed'].mean()*100:.1f}%)",
-                 fontsize=14, pad=20)
+        
+        title_parts = [f"Multimer Test: {project_name}"]
+        if robust:
+            num_passed_models = df['passed'].sum()
+            num_unique_passed_sequences = len(df[df['passed']].groupby('backbone_id'))
+            num_backbones_with_any_pass = len(df.groupby('backbone_id').filter(lambda x: x['passed'].any()).groupby('backbone_id'))
+
+            title_parts.extend([
+                f"Models Passed: {num_passed_models}/{len(df)}",
+                f"Unique Passed Sequences: {num_unique_passed_sequences}/{len(df.groupby('backbone_id'))}",
+                f"Backbones with Any Pass: {num_backbones_with_any_pass}"
+            ])
+        else:
+            title_parts.append(f"Passed: {df['passed'].sum()}/{len(df)} ({df['passed'].mean()*100:.1f}%)")
+        
+        plt.title("\n".join(title_parts), fontsize=14, pad=20)
+
         
         cbar = plt.colorbar(scatter)
         cbar.set_label("ipTM Score", fontsize=12)
         
         # Legend and grid
         legend_elements = [
-            plt.Line2D([0], [0], color='red', ls='--', lw=1.5, 
-                      label=f'RMSD Threshold ({rmsd_threshold}Å)'),
+            plt.Line2D([0], [0], color='red', ls='--', lw=1.5,
+                       label=f'RMSD Threshold ({rmsd_threshold}Å)'),
             plt.Line2D([0], [0], color='blue', ls='--', lw=1.5,
-                      label=f'pLDDT Threshold ({plddt_threshold})')
+                       label=f'pLDDT Threshold ({plddt_threshold})'),
+            plt.Line2D([0], [0], color='black', ls='--', lw=1.5,
+                       label=f'ipTM Threshold ({iptm_threshold})')
         ]
         plt.legend(handles=legend_elements, loc='upper right', framealpha=0.9)
+        
+        # Add green circles for points passing all thresholds
+        passed_df = df[df['passed']]
+        plt.scatter(passed_df['rmsd_A'], passed_df['plddt'],
+                    c='none', edgecolors='g', linewidth=2, s=100)
+
         
         plt.grid(True, alpha=0.3, linestyle='--')
         plt.tight_layout()
@@ -242,14 +293,25 @@ if __name__ == "__main__":
     parser.add_argument('--rfdiff-backbones', required=True, help="Directory with reference backbones")
     parser.add_argument('--output-dir', required=True, help="Output directory")
     parser.add_argument('--project-name', default="Binder")
-    parser.add_argument('--plddt-threshold', type=float, default=80.0, 
-                      help="pLDDT threshold for filtering")
-    parser.add_argument('--rmsd-threshold', type=float, default=2.0, 
-                      help="RMSD threshold for binder chain")
-    parser.add_argument('--rmsd-B-threshold', type=float, default=3.0, 
-                      help="RMSD threshold for target chain alignment")
+    parser.add_argument('--plddt-threshold', type=float, default=80.0,
+                        help="pLDDT threshold for filtering")
+    parser.add_argument('--rmsd-threshold', type=float, default=2.5,
+                        help="RMSD threshold for binder chain")
+    parser.add_argument('--rmsd-B-threshold', type=float, default=3.5,
+                        help="RMSD threshold for target chain alignment")
+    parser.add_argument('--robust', action='store_true', help='Enable robust processing of all models')
+    parser.add_argument('--min-passed', type=int, default=1,
+                        help='[Robust only] Minimum models per seed that must pass thresholds')
+    parser.add_argument('--iptm-threshold', type=float, default=0.6,
+                        help='ipTM threshold for filtering')
     args = parser.parse_args()
     
+    # Validation
+    if not args.robust and args.min_passed != 1:
+        print("Warning: --min_passed is ignored in standard mode")
+    if args.robust and args.min_passed < 1:
+        raise ValueError("--min_passed must be ≥1 in robust mode")
+
     process_models(
         args.af_models,
         args.rfdiff_backbones,
@@ -257,5 +319,8 @@ if __name__ == "__main__":
         args.project_name,
         args.plddt_threshold,
         args.rmsd_threshold,
-        args.rmsd_B_threshold
+        args.rmsd_B_threshold,
+        args.robust,
+        args.min_passed,
+        args.iptm_threshold
     )

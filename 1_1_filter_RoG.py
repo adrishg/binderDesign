@@ -158,4 +158,10 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    # Pass the new argument
+    # Pass the new argument names to main()
+    main(
+        pdb_directory=args.input_dir, 
+        chain=args.chain, 
+        output_dir=args.output_dir, 
+        rg_cutoff=args.rg_cutoff
+    )
