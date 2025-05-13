@@ -95,5 +95,5 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
 
     # Run ColabFold
     echo "Running ColabFold on: $processed_fasta"
-    colabfold_batch --msa-mode single_sequence --num-recycle 5 --num-seed 3 "$processed_fasta" "$output_dir"
+    colabfold_batch --msa-mode single_sequence --num-recycle 3 --num-seed 3 "$processed_fasta" "$output_dir"
 done
