@@ -2,7 +2,7 @@
 #SBATCH -p gpu-vladimir           # Partition name
 #SBATCH -t 20-12:00:00            # 20 days 12 hours just in case
 #SBATCH --job-name=binder # Job name
-#SBATCH --mem=32G ####testing lowering cpu mem here (needed for filtering steps that run here and not as separate job)
+#SBATCH --mem=25G ####testing lowering cpu mem here (needed for filtering steps that run here and not as separate job)
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END           # Mail at end of run
 

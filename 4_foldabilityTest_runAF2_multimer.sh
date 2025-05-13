@@ -2,8 +2,8 @@
 #SBATCH -p gpu-vladimir
 #SBATCH --gres=gpu:1
 #SBATCH -t 10-12:00:00
-#SBATCH --job-name=foldabilityTest_multimer
-#SBATCH --mem=125G
+#SBATCH --job-name=multimerTest
+#SBATCH --mem=50G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu
 #SBATCH --mail-type=END
 

@@ -2,8 +2,8 @@
 #SBATCH -p gpu-vladimir
 #SBATCH --gres=gpu:1
 #SBATCH -t 2-12:00:00
-#SBATCH --job-name=sequenceDesign_lMPNN_scaffolding
-#SBATCH --mem=125G
+#SBATCH --job-name=seqDesign
+#SBATCH --mem=50G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu
 #SBATCH --mail-type=END
 

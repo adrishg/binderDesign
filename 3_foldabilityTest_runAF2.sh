@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:1              # Request 2 GPUs
 #SBATCH -t 10-12:00:00            # 10 days just in case
 #SBATCH --job-name=foldabilityTest # Job name
-#SBATCH --mem=125G
+#SBATCH --mem=50G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu # Mail me after run
 #SBATCH --mail-type=END           # Mail at end of run
 
