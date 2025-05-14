@@ -1,0 +1,36 @@
+<ROSETTASCRIPTS>
+    <SCOREFXNS>
+        <ScoreFunction name="ref2015" weights="ref2015" />
+    </SCOREFXNS>
+
+    <SIMPLE_METRICS>
+        <RMSDMetric name="rmsd_metric" reference_name="initial_pose" super="1" rmsd_type="rmsd_all" />
+    </SIMPLE_METRICS>
+
+    <MOVERS>
+        <SavePoseMover name="save_initial_pose" reference_name="initial_pose" />
+
+        <Docking name="dock"
+                 score_low="ref2015"
+                 score_high="ref2015"
+                 fullatom="1"
+                 local_refine="1" />
+
+        <InterfaceAnalyzerMover name="iface"
+                                 scorefxn="ref2015"
+                                 pack_separated="1"
+                                 pack_input="0"
+                                 interface="B_A" />
+
+        <RunSimpleMetrics name="run_rmsd" metrics="rmsd_metric" />
+    </MOVERS>
+
+    <PROTOCOLS>
+        <Add mover_name="save_initial_pose" />
+        <Add mover_name="dock" />
+        <Add mover_name="iface" />
+        <Add mover_name="run_rmsd" />
+    </PROTOCOLS>
+
+    <OUTPUT scorefxn="ref2015" />
+</ROSETTASCRIPTS>
