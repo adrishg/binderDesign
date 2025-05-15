@@ -57,7 +57,7 @@ for pdb in "$input_dir"/*.pdb; do
 
     # Submit SLURM job for this pdb
     echo "[INFO] Submitting job for: $short_name"
-    sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/ppDocking_run.sh \
+    sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/run_ppDocking.sh \
         --input-pdb "$renamed_dir/${short_name}.pdb" \
         --file-handle "$short_name" \
         --input-xml "$xml_protocol" \
