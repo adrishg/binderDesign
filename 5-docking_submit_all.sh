@@ -28,7 +28,7 @@ fi
 
 # ========== Setup paths ==========
 renamed_dir="${output_base}/input_pdbs"
-jobs_dir="${output_base}/docking_ouputs"
+jobs_dir="${output_base}/docking_outputs"
 xml_protocol="/share/yarovlab/ahgz/scripts/binderDesign/ppDocking.xml" 
 
 mkdir -p "$renamed_dir"

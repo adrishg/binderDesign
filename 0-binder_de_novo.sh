@@ -98,7 +98,7 @@ mkdir -p "$project_path"/3-FoldabilityTest/output_results/
 # Part 2: Filtering and making the plot, csv file and making copy of files that passes
 python3 /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_filter_plot.py \
     --af-models "$project_path/3-FoldabilityTest/af2_output/" \
-    --rfdiff-backbones "$project_path/1.5-FilteringBackbones/visually_inspected_T30/" \
+    --rfdiff-backbones "$project_path/1.5-FilteringBackbones/visually_inspected/" \
     --output-dir "$project_path/3-FoldabilityTest/output_results/" \
     --plddt_threshold 90\
     --rmsd_threshold 2
