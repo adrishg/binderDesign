@@ -72,12 +72,12 @@ def align_by_sequence_and_kabsch(model_seq, model_coords, ref_seq, ref_coords):
     aligner.extend_gap_score = -0.5
     aligner.match_score = 2.0
     aligner.mismatch_score = -1.0
-    
+
     try:
         alignment = max(aligner.align(model_seq, ref_seq), key=lambda a: a.score)
     except:
         return "No alignment found", None, None, None, None
-    
+
     aligned_model_coords = []
     aligned_ref_coords = []
     for seg_model, seg_ref in zip(alignment.aligned[0], alignment.aligned[1]):
@@ -85,23 +85,23 @@ def align_by_sequence_and_kabsch(model_seq, model_coords, ref_seq, ref_coords):
         r_start, r_end = seg_ref
         aligned_model_coords.extend(model_coords[m_start:m_end])
         aligned_ref_coords.extend(ref_coords[r_start:r_end])
-    
+
     if len(aligned_model_coords) < 3:
         return "Too few aligned positions", None, None, None, None
-    
+
     model = np.array(aligned_model_coords)
     ref = np.array(aligned_ref_coords)
     model_center = model.mean(axis=0)
     ref_center = ref.mean(axis=0)
     model_centered = model - model_center
     ref_centered = ref - ref_center
-    
+
     H = model_centered.T @ ref_centered
     U, _, Vt = np.linalg.svd(H)
     if np.linalg.det(U @ Vt) < 0:
         U[:, -1] *= -1
     R = U @ Vt
-    
+
     transformed_model = model_centered @ R + ref_center
     rmsd_B = np.sqrt(np.mean(np.sum((transformed_model - ref)**2, axis=1)))
     return R, model_center, ref_center, len(aligned_model_coords), rmsd_B
@@ -124,7 +124,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
     model_dir = os.path.join(output_dir, "models")
     os.makedirs(model_dir, exist_ok=True)
     results = []
-    
+
     for file in os.listdir(af_models):
         if not file.endswith(".pdb"):
             continue
@@ -138,10 +138,10 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         ref_path = os.path.join(rfdiff_backbones, f"{backbone_id}.pdb")
         if not os.path.exists(ref_path):
             continue
-        
+
         model_seq_B, model_coords_B = extract_sequence_and_coords(model_path, "B")
         ref_seq_B, ref_coords_B = extract_sequence_and_coords(ref_path, "B")
-        
+
         align_result = align_by_sequence_and_kabsch(model_seq_B, model_coords_B, ref_seq_B, ref_coords_B)
         if isinstance(align_result, str):
             results.append({
@@ -151,7 +151,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
                 'passed': False
             })
             continue
-            
+
         R, center_model, center_ref, matched_B, rmsd_B = align_result
         if rmsd_B > rmsd_B_threshold:
             results.append({
@@ -161,7 +161,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
                 'passed': False
             })
             continue
-            
+
         rmsd_A, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
         if isinstance(rmsd_A, str):
             results.append({
@@ -171,16 +171,16 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
                 'passed': False
             })
             continue
-        
+
         json_file = re.sub("unrelaxed", "scores", file).replace(".pdb", ".json")
         json_path = os.path.join(af_models, json_file)
         iptm = extract_iptm(json_path)
-        
-        avg_plddt = np.mean([float(line[60:66]) for line in open(model_path) 
+
+        avg_plddt = np.mean([float(line[60:66]) for line in open(model_path)
                             if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
-        
+
         passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold and iptm > iptm_threshold)
-        
+
         results.append({
             'backbone_id': backbone_id,
             'file': file,
@@ -193,7 +193,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
             'used_CA_chainB': matched_B,
             'passed': passed
         })
-    
+
     df = pd.DataFrame(results)
     df.to_csv(os.path.join(output_dir, "multimerTest_all.csv"), index=False)
 
@@ -207,11 +207,15 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
         # Filter backbones that meet the minimum passed threshold
         passed_backbones = sequence_stats[sequence_stats['passed_models'] >= min_passed]
-        
+
         if not passed_backbones.empty:
             filtered_df = df[df['backbone_id'].isin(passed_backbones['backbone_id'])]
             filtered_df = filtered_df[filtered_df['passed']]
             filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+             # Copy passing models
+            for _, row in filtered_df.iterrows():
+                model_file_path = os.path.join(af_models, row['file'])
+                shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
         else:
             filtered_df = pd.DataFrame()  # Create an empty DataFrame
             filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
@@ -219,29 +223,33 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
     else:
         filtered_df = df[df['passed']]
         filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
-    
+         # Copy passing models
+        for _, row in filtered_df.iterrows():
+            model_file_path = os.path.join(af_models, row['file'])
+            shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
+
     with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
         for _, row in filtered_df.iterrows():
             f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
-    
+
     # Enhanced plotting
     df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
     if not df_plot.empty:
         plt.figure(figsize=(10, 7))
-        
+
         # Use magma colormap
         scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'],
                             c=df_plot['iptm'], cmap='magma',
                             alpha=0.8, edgecolors='w', linewidth=0.5)
-        
+
         # Add threshold lines
         plt.axvline(x=rmsd_threshold, color='red', linestyle='--', linewidth=1.5)
         plt.axhline(y=plddt_threshold, color='blue', linestyle='--', linewidth=1.5)
-        
+
         # Formatting
         plt.xlabel("RMSD of Binder (Å)", fontsize=12)
         plt.ylabel("pLDDT of Binder", fontsize=12)
-        
+
         title_parts = [f"Multimer Test: {project_name}"]
         if robust:
             num_passed_models = df['passed'].sum()
@@ -255,13 +263,13 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
             ])
         else:
             title_parts.append(f"Passed: {df['passed'].sum()}/{len(df)} ({df['passed'].mean()*100:.1f}%)")
-        
+
         plt.title("\n".join(title_parts), fontsize=14, pad=20)
 
-        
+
         cbar = plt.colorbar(scatter)
         cbar.set_label("ipTM Score", fontsize=12)
-        
+
         # Legend and grid
         legend_elements = [
             plt.Line2D([0], [0], color='red', ls='--', lw=1.5,
@@ -272,16 +280,16 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
                        label=f'ipTM Threshold ({iptm_threshold})')
         ]
         plt.legend(handles=legend_elements, loc='upper right', framealpha=0.9)
-        
+
         # Add green circles for points passing all thresholds
         passed_df = df[df['passed']]
         plt.scatter(passed_df['rmsd_A'], passed_df['plddt'],
                     c='none', edgecolors='g', linewidth=2, s=100)
 
-        
+
         plt.grid(True, alpha=0.3, linestyle='--')
         plt.tight_layout()
-        
+
         plot_path = os.path.join(output_dir, "multimerTest_plot.png")
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -295,9 +303,9 @@ if __name__ == "__main__":
     parser.add_argument('--project-name', default="Binder")
     parser.add_argument('--plddt-threshold', type=float, default=80.0,
                         help="pLDDT threshold for filtering")
-    parser.add_argument('--rmsd-threshold', type=float, default=2.5,
+    parser.add_argument('--rmsd-threshold', type=float, default=2.0,
                         help="RMSD threshold for binder chain")
-    parser.add_argument('--rmsd-B-threshold', type=float, default=3.5,
+    parser.add_argument('--rmsd-B-threshold', type=float, default=3.0,
                         help="RMSD threshold for target chain alignment")
     parser.add_argument('--robust', action='store_true', help='Enable robust processing of all models')
     parser.add_argument('--min-passed', type=int, default=1,
@@ -305,7 +313,7 @@ if __name__ == "__main__":
     parser.add_argument('--iptm-threshold', type=float, default=0.6,
                         help='ipTM threshold for filtering')
     args = parser.parse_args()
-    
+
     # Validation
     if not args.robust and args.min_passed != 1:
         print("Warning: --min_passed is ignored in standard mode")
