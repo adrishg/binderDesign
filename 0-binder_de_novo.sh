@@ -131,7 +131,7 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/5-docking_submit_all.sh 
 
 #Part 2: Analyze and make plots of docking results
 python3 /share/yarovlab/ahgz/scripts/binderDesign/5-docking_analysis_plot.py \
-   --input-dir "$project_path/5-Docking/"\
+   --input-dir "$project_path/5-Docking/docking_outputs/"\
    --project-name "$project_name" \
    --results-dir "$project_path/5-Docking/output_results"
 

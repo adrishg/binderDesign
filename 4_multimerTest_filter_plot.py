@@ -118,8 +118,8 @@ def transform_and_rmsd_chainA(model_file, backbone_file, R, center_modelB, cente
     return rmsd, min_len
 
 def process_models(af_models, rfdiff_backbones, output_dir, project_name,
-                    plddt_threshold=80.0, rmsd_threshold=2.0, rmsd_B_threshold=3.0,
-                    robust=False, min_passed=1, iptm_threshold = 0.6):
+                   plddt_threshold=80.0, rmsd_threshold=2.0, rmsd_B_threshold=3.0,
+                   robust=False, min_passed=1, iptm_threshold = 0.6, show_green_circles=False):
     os.makedirs(output_dir, exist_ok=True)
     model_dir = os.path.join(output_dir, "models")
     os.makedirs(model_dir, exist_ok=True)
@@ -177,9 +177,9 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         iptm = extract_iptm(json_path)
 
         avg_plddt = np.mean([float(line[60:66]) for line in open(model_path)
-                            if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
+                             if line.startswith("ATOM") and line[13:15].strip() == "CA" and line[21] == 'A'])
 
-        passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold and iptm > iptm_threshold)
+        passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold and iptm is not None and iptm > iptm_threshold)
 
         results.append({
             'backbone_id': backbone_id,
@@ -212,7 +212,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
             filtered_df = df[df['backbone_id'].isin(passed_backbones['backbone_id'])]
             filtered_df = filtered_df[filtered_df['passed']]
             filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
-             # Copy passing models
+            # Copy passing models
             for _, row in filtered_df.iterrows():
                 model_file_path = os.path.join(af_models, row['file'])
                 shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
@@ -223,7 +223,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
     else:
         filtered_df = df[df['passed']]
         filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
-         # Copy passing models
+        # Copy passing models
         for _, row in filtered_df.iterrows():
             model_file_path = os.path.join(af_models, row['file'])
             shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
@@ -239,12 +239,14 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
         # Use magma colormap
         scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'],
-                            c=df_plot['iptm'], cmap='magma',
-                            alpha=0.8, edgecolors='w', linewidth=0.5)
+                              c=df_plot['iptm'], cmap='magma',
+                              alpha=0.8, edgecolors='w', linewidth=0.5)
 
         # Add threshold lines
         plt.axvline(x=rmsd_threshold, color='red', linestyle='--', linewidth=1.5)
         plt.axhline(y=plddt_threshold, color='blue', linestyle='--', linewidth=1.5)
+        # Add ipTM threshold line to the legend (no vertical line needed for ipTM on this plot)
+        # The ipTM threshold is implicitly handled by the color mapping and the 'passed' logic.
 
         # Formatting
         plt.xlabel("RMSD of Binder (Å)", fontsize=12)
@@ -273,18 +275,19 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         # Legend and grid
         legend_elements = [
             plt.Line2D([0], [0], color='red', ls='--', lw=1.5,
-                       label=f'RMSD Threshold ({rmsd_threshold}Å)'),
+                                 label=f'RMSD Threshold ({rmsd_threshold}Å)'),
             plt.Line2D([0], [0], color='blue', ls='--', lw=1.5,
-                       label=f'pLDDT Threshold ({plddt_threshold})'),
-            plt.Line2D([0], [0], color='black', ls='--', lw=1.5,
-                       label=f'ipTM Threshold ({iptm_threshold})')
+                                 label=f'pLDDT Threshold ({plddt_threshold})'),
+            plt.Line2D([0], [0], color='black', ls='--', lw=1.5, # Placeholder for ipTM in legend
+                                 label=f'ipTM Threshold ({iptm_threshold})')
         ]
         plt.legend(handles=legend_elements, loc='upper right', framealpha=0.9)
 
-        # Add green circles for points passing all thresholds
-        passed_df = df[df['passed']]
-        plt.scatter(passed_df['rmsd_A'], passed_df['plddt'],
-                    c='none', edgecolors='g', linewidth=2, s=100)
+        # Conditionally add green circles for points passing all thresholds
+        if show_green_circles:
+            passed_df = df[df['passed']]
+            plt.scatter(passed_df['rmsd_A'], passed_df['plddt'],
+                        c='none', edgecolors='g', linewidth=2, s=100)
 
 
         plt.grid(True, alpha=0.3, linestyle='--')
@@ -312,6 +315,8 @@ if __name__ == "__main__":
                         help='[Robust only] Minimum models per seed that must pass thresholds')
     parser.add_argument('--iptm-threshold', type=float, default=0.6,
                         help='ipTM threshold for filtering')
+    parser.add_argument('--green-circles', action='store_true',
+                        help='Show green circles around models that passed all thresholds in the plot.')
     args = parser.parse_args()
 
     # Validation
@@ -330,5 +335,6 @@ if __name__ == "__main__":
         args.rmsd_B_threshold,
         args.robust,
         args.min_passed,
-        args.iptm_threshold
+        args.iptm_threshold,
+        args.green_circles # Pass the new argument
     )
