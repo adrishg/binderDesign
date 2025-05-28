@@ -12,7 +12,7 @@ conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
 # Default number of parallel jobs
-NUM_PARALLEL=10
+NUM_PARALLEL=4
 
 # Usage function
 usage() {
