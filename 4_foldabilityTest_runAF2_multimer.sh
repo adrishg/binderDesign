@@ -83,7 +83,7 @@ if [[ -n "$current_seq" ]]; then
 fi
 
 echo "Running ColabFold multimer..."
-colabfold_batch \
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
     --msa-mode single_sequence \
     --templates \
     --custom-template-path "$TEMPLATE_PDB" \
