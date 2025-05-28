@@ -93,4 +93,4 @@ CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
     "$COMBINED_FASTA" "$OUTPUT_PATH"
 
 
-echo " Multimer modeling complete. Results saved to: $OUTPUT_PATH"
+echo " Multimer modeling

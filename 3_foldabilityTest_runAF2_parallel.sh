@@ -11,9 +11,12 @@ source /share/yarovlab/ahgz/.bashrc
 conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
+# Default number of parallel jobs
+NUM_PARALLEL=10
+
 # Usage function
 usage() {
-    echo "Usage: $0 --seqs-dir DIR --output-dir DIR --project-name NAME"
+    echo "Usage: $0 --seqs-dir DIR --output-dir DIR --project-name NAME [--num-parallel N]"
     exit 1
 }
 
@@ -23,6 +26,7 @@ while [[ $# -gt 0 ]]; do
         --seqs-dir) SEQ_FOLDER="$2"; shift 2 ;;
         --output-dir) OUTPUT_DIR_BASE="$2"; shift 2 ;;
         --project-name) ALIAS_PREFIX="$2"; shift 2 ;;
+        --num-parallel) NUM_PARALLEL="$2"; shift 2 ;;
         -h|--help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -82,20 +86,21 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
         fi
     fi
 
-    # Step 2: Split into 4 batches
+    # Step 2: Split into batches
     split_dir="$output_dir/split_batches"
     mkdir -p "$split_dir"
-    awk -v n=4 -v out="$split_dir/batch" '
+    awk -v n=$NUM_PARALLEL -v out="$split_dir/batch" '
         /^>/ {if (seq) print seq > (out file_count ".fa"); file_count = (file_count+1)%n; print > (out file_count ".fa"); seq=""}
         !/^>/ {seq=seq $0}
         END {if (seq) print seq > (out file_count ".fa")}
     ' "$processed_fasta"
 
     # Step 3: Run in parallel
-    echo "Launching 4 parallel ColabFold jobs for $base_name"
-    parallel -j 4 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
+    echo "Launching $NUM_PARALLEL parallel ColabFold jobs for $base_name"
+    parallel -j $NUM_PARALLEL CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
         --msa-mode single_sequence \
         --num-recycle 3 \
         --num-seed 3 \
         {} "$output_dir" ::: "$split_dir"/batch*.fa
+
 done

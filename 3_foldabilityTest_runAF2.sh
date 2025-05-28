@@ -63,6 +63,4 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
     done < "$fasta_file"
 
     # Run colabfold_batch on the modified FASTA file
-    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch --msa-mode single_sequence --num-recycle 5 --num-seed 3 "$temp_fasta" "$output_dir"
-done
-
+    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch --msa-mode single_sequence --num-recycle 5 --nu
