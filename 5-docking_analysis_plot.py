@@ -7,6 +7,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.colors import Normalize
 import matplotlib.cm as cm
 import numpy as np
+import seaborn as sns # Import seaborn
 
 def calculate_funnelness(dataframe, energy_col):
     """
@@ -124,7 +125,8 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             # The header line needs to be properly split to get column names
             column_names = re.split(r'\s+', merged_lines[0].replace('SCORE:', '').strip())
             # Read the data, skipping the header line and using the parsed column names
-            df = pd.read_csv(merged_path, skiprows=1, delim_whitespace=True, names=column_names)
+            # Changed delim_whitespace to sep='\s+'
+            df = pd.read_csv(merged_path, skiprows=1, sep='\s+', names=column_names)
         except Exception as e:
             print(f"[ERROR] Could not parse merged file {merged_path} into DataFrame: {e}, skipping {subdir}.")
             os.remove(merged_path) # Clean up temp file
@@ -151,13 +153,14 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
 
         # --- Plotting function for reusability ---
         def create_plot(dataframe, x_col, y_col, plot_title_suffix, filename_suffix):
-            plt.figure(figsize=(10, 8))
+            fig = plt.figure(figsize=(12, 8)) # Slightly wider figure to accommodate colorbar outside
             gs = GridSpec(4, 4)
             scatter_ax = plt.subplot(gs[1:, :-1])
             hist_x = plt.subplot(gs[0, :-1], sharex=scatter_ax)
             hist_y = plt.subplot(gs[1:, -1], sharey=scatter_ax)
 
-            cmap = cm.rocket # Colormap set to 'rocket'
+            cmap = sns.color_palette("rocket", as_cmap=True) # Changed colormap to 'rocket' from seaborn
+            
             # Use quantiles for normalization to handle outliers gracefully
             q_low = dataframe['total_score'].quantile(0.05)
             q_high = dataframe['total_score'].quantile(0.95)
@@ -165,7 +168,7 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             colors = cmap(norm(dataframe['total_score']))
 
             # Scatter plot
-            scatter_ax.scatter(dataframe[x_col], dataframe[y_col], c=colors, alpha=0.7)
+            scatter_ax.scatter(dataframe[x_col], dataframe[y_col], c=colors, alpha=0.7, s=50) # Increased marker size (s) for slightly thicker appearance
             scatter_ax.set_xlabel(x_col.replace('_', ' ').upper(), fontsize=14) # Larger axis labels
             scatter_ax.set_ylabel(y_col.replace('_', ' ').upper(), fontsize=14) # Larger axis labels
             scatter_ax.set_title(f"{project_name} - {subdir} {plot_title_suffix}", fontsize=16) # Larger title
@@ -181,18 +184,31 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
 
             for i in range(len(hist_x_vals)):
                 hist_x.bar(hist_x_edges[i], hist_x_vals[i], width=hist_x_edges[i+1]-hist_x_edges[i],
-                           color=cmap(norm_hist_x(hist_x_edges[i])), alpha=0.6, align='edge')
+                           color=cmap(norm_hist_x(hist_x_edges[i])), alpha=0.7, align='edge',
+                           edgecolor='black', linewidth=0.8) # Thicker histogram lines
 
             for i in range(len(hist_y_vals)):
                 hist_y.barh(hist_y_edges[i], hist_y_vals[i], height=hist_y_edges[i+1]-hist_y_edges[i],
-                            color=cmap(norm_hist_y(hist_y_edges[i])), alpha=0.6, align='edge')
+                            color=cmap(norm_hist_y(hist_y_edges[i])), alpha=0.7, align='edge',
+                            edgecolor='black', linewidth=0.8) # Thicker histogram lines
 
             hist_x.set_ylabel('Frequency', fontsize=12) # Slightly larger
             hist_y.set_xlabel('Frequency', fontsize=12) # Slightly larger
             hist_x.tick_params(axis='x', labelbottom=False, labelsize=10) # Adjust tick label size if needed
             hist_y.tick_params(axis='y', labelleft=False, labelsize=10) # Adjust tick label size if needed
 
-            plt.tight_layout()
+            # Add colorbar (legend) outside the main plot
+            cbar_ax = fig.add_subplot(gs[1:, -1], frameon=False) # Create an axes for the colorbar, slightly adjusting GridSpec
+            cbar_ax.set_xticks([]) # Remove ticks
+            cbar_ax.set_yticks([]) # Remove ticks
+
+            # Manually position the colorbar to the right of the main scatter plot
+            # (adjusting the rightmost column for this)
+            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), cax=fig.add_axes([0.92, 0.25, 0.02, 0.5]), # [left, bottom, width, height]
+                                label='Total Score', orientation='vertical')
+            cbar.set_label('Total Score', fontsize=12) # Adjust label font size
+
+            plt.tight_layout(rect=[0, 0, 0.9, 1]) # Adjust tight_layout to make space for the colorbar
             plot_path = os.path.join(results_dir, f"{subdir}_{filename_suffix}.png")
             plt.savefig(plot_path)
             plt.close()
@@ -220,14 +236,14 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             "lowest_dG_cross_pose": dg_row['description'],
             "lowest_dG_cross_value": dg_row['dG_cross'],
             "rmsd_of_lowest_dG_cross": dg_row['rms'],
-            "funnelness_dG_cross": funnelness_dg, # Added funnelness for dG_cross
+            "funnelness_dG_cross": funnelness_dg,
             "lowest_rmsd_pose": rmsd_row['description'],
             "lowest_rmsd_value": rmsd_row['rms'],
             "dG_cross_of_lowest_rmsd": rmsd_row['dG_cross'],
             "lowest_I_sc_pose": isc_row['description'],
             "lowest_I_sc_value": isc_row['I_sc'],
             "rmsd_of_lowest_I_sc": isc_row['rms'],
-            "funnelness_I_sc": funnelness_isc # Added funnelness for I_sc
+            "funnelness_I_sc": funnelness_isc
         }])
 
         all_summaries.append(summary)
