@@ -152,13 +152,13 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
 
         # --- Plotting function for reusability ---
         def create_plot(dataframe, x_col, y_col, plot_title_suffix, filename_suffix):
-            fig = plt.figure(figsize=(12, 8)) # Slightly wider figure to accommodate colorbar outside
+            fig = plt.figure(figsize=(10, 8))
             gs = GridSpec(4, 4)
             scatter_ax = plt.subplot(gs[1:, :-1])
             hist_x = plt.subplot(gs[0, :-1], sharex=scatter_ax)
             hist_y = plt.subplot(gs[1:, -1], sharey=scatter_ax)
 
-            cmap = sns.color_palette("rocket", as_cmap=True) # Colormap set to 'rocket' from seaborn
+            cmap = sns.color_palette("rocket", as_cmap=True)
             
             # Use quantiles for normalization to handle outliers gracefully
             q_low = dataframe['total_score'].quantile(0.05)
@@ -167,13 +167,13 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             colors = cmap(norm(dataframe['total_score']))
 
             # Scatter plot
-            scatter_ax.scatter(dataframe[x_col], dataframe[y_col], c=colors, alpha=0.7, s=50) # Increased marker size (s) for slightly thicker appearance
-            scatter_ax.set_xlabel(x_col.replace('_', ' ').upper(), fontsize=14) # Larger axis labels
-            scatter_ax.set_ylabel(y_col.replace('_', ' ').upper(), fontsize=14) # Larger axis labels
-            scatter_ax.set_title(f"{project_name} - {subdir} {plot_title_suffix}", fontsize=16) # Larger title
+            scatter_ax.scatter(dataframe[x_col], dataframe[y_col], c=colors, alpha=0.7, s=50)
+            scatter_ax.set_xlabel(x_col.replace('_', ' ').upper(), fontsize=14)
+            scatter_ax.set_ylabel(y_col.replace('_', ' ').upper(), fontsize=14)
+            scatter_ax.set_title(f"{project_name} - {subdir} {plot_title_suffix}", fontsize=16)
 
             # Histograms
-            bins = 30 # Increased bins for smoother histograms
+            bins = 30
             hist_x_vals, hist_x_edges = np.histogram(dataframe[x_col], bins=bins)
             hist_y_vals, hist_y_edges = np.histogram(dataframe[y_col], bins=bins)
 
@@ -183,28 +183,19 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
 
             for i in range(len(hist_x_vals)):
                 hist_x.bar(hist_x_edges[i], hist_x_vals[i], width=hist_x_edges[i+1]-hist_x_edges[i],
-                           color=cmap(norm_hist_x(hist_x_edges[i])), alpha=0.7, align='edge',
-                           edgecolor='black', linewidth=0.8) # Thicker histogram lines
+                           color=cmap(norm_hist_x(hist_x_edges[i])), alpha=0.7, align='edge') # Removed edgecolor and linewidth
 
             for i in range(len(hist_y_vals)):
                 hist_y.barh(hist_y_edges[i], hist_y_vals[i], height=hist_y_edges[i+1]-hist_y_edges[i],
-                            color=cmap(norm_hist_y(hist_y_edges[i])), alpha=0.7, align='edge',
-                            edgecolor='black', linewidth=0.8) # Thicker histogram lines
+                            color=cmap(norm_hist_y(hist_y_edges[i])), alpha=0.7, align='edge') # Removed edgecolor and linewidth
 
-            hist_x.set_ylabel('Frequency', fontsize=12) # Slightly larger
-            hist_y.set_xlabel('Frequency', fontsize=12) # Slightly larger
-            hist_x.tick_params(axis='x', labelbottom=False, labelsize=10) # Adjust tick label size if needed
-            hist_y.tick_params(axis='y', labelleft=False, labelsize=10) # Adjust tick label size if needed
+            hist_x.set_ylabel('Frequency', fontsize=12)
+            hist_y.set_xlabel('Frequency', fontsize=12)
+            hist_x.tick_params(axis='x', labelbottom=False, labelsize=10)
+            hist_y.tick_params(axis='y', labelleft=False, labelsize=10)
 
-            # Add colorbar (legend) outside the main plot
-            # Manually position the colorbar to the right of the main scatter plot
-            # [left, bottom, width, height] in figure coordinates (0 to 1)
-            cbar_ax = fig.add_axes([0.92, 0.25, 0.02, 0.5])
-            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), cax=cbar_ax,
-                                label='Total Score', orientation='vertical')
-            cbar.set_label('Total Score', fontsize=12) # Adjust label font size
+            plt.tight_layout() # Reverted to default tight_layout
 
-            plt.tight_layout(rect=[0, 0, 0.9, 1]) # Adjust tight_layout to make space for the colorbar
             plot_path = os.path.join(results_dir, f"{subdir}_{filename_suffix}.png")
             plt.savefig(plot_path)
             plt.close()
@@ -243,7 +234,6 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
         }])
 
         all_summaries.append(summary)
-        # No need to remove merged_path here as it's not created anymore
 
     # Concatenate all individual summaries into one master summary CSV
     if all_summaries:
