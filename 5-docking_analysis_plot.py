@@ -8,6 +8,7 @@ from matplotlib.colors import Normalize
 import matplotlib.cm as cm
 import numpy as np
 import seaborn as sns # Import seaborn
+import io # For StringIO (though not strictly used for file reading anymore, good for general parsing)
 
 def calculate_funnelness(dataframe, energy_col):
     """
@@ -23,7 +24,7 @@ def calculate_funnelness(dataframe, energy_col):
     Returns:
         float: The calculated funnelness score (between 0 and 1).
     """
-    if dataframe.empty:
+    if dataframe.empty or 'rms' not in dataframe.columns or energy_col not in dataframe.columns:
         return np.nan
 
     # Sort by energy_col to get the lowest energy poses
@@ -78,66 +79,65 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             print(f"[INFO] Skipping {subdir_path}: 'scorefiles' directory not found.")
             continue
 
-        merged_lines = []
-        header = None
-        # Merge all .sc files within the scorefiles directory
+        all_data_rows_raw = [] # To store raw data lines after removing "SCORE:"
+        column_names = None
+
+        # First pass: find the header and collect all data lines
         for file in sorted(os.listdir(scorefiles_dir)):
             if file.endswith(".sc"):
                 file_path = os.path.join(scorefiles_dir, file)
                 try:
                     with open(file_path, "r") as f:
                         for line in f:
-                            # Skip 'SEQUENCE:' lines
                             if line.startswith("SEQUENCE:"):
                                 continue
-                            # Capture header line and append subsequent score lines
-                            if line.startswith("SCORE: total_score") and header is None:
-                                header = line.strip() # Store header without leading/trailing whitespace
-                                merged_lines.append(header)
-                            elif not line.startswith("SCORE: total_score"):
-                                merged_lines.append(line.strip()) # Append score lines without leading/trailing whitespace
+                            if line.startswith("SCORE: total_score"):
+                                if column_names is None: # Only parse header once from the first encountered header
+                                    # Remove "SCORE:" prefix, strip, and split by one or more spaces
+                                    # This creates a list of column names like ['total_score', 'score', 'rms', ...]
+                                    column_names = re.split(r'\s+', line[len("SCORE:"):].strip())
+                                continue # Skip header line itself for data collection
+                            elif line.startswith("SCORE:"):
+                                # Remove "SCORE:" prefix and append the rest of the line
+                                all_data_rows_raw.append(line[len("SCORE:"):].strip())
                 except Exception as e:
                     print(f"[WARN] Could not read file {file_path}: {e}")
                     continue
 
-        if not merged_lines:
-            print(f"[WARN] No valid score data found in {subdir_path}, skipping.")
+        if not all_data_rows_raw or column_names is None:
+            print(f"[WARN] No valid score data or header found in {subdir_path}, skipping.")
             continue
 
-        # Write merged data to a temporary file
-        merged_path = os.path.join(results_dir, f"{subdir}_merged_temp.sc")
-        try:
-            with open(merged_path, "w") as f_out:
-                # Add a newline after the header if it's the only line or before other data
-                if len(merged_lines) > 1:
-                    f_out.write(merged_lines[0] + '\n')
-                    f_out.write('\n'.join(merged_lines[1:]))
-                else: # Only header or no data after header
-                    f_out.write(merged_lines[0])
-            print(f"[INFO] Merged score data written to {merged_path}")
-        except Exception as e:
-            print(f"[ERROR] Could not write merged file {merged_path}: {e}, skipping {subdir}.")
+        # Now, parse the collected raw data rows into a list of lists, handling the description column
+        parsed_data = []
+        # The number of fixed columns (non-description) is total columns - 1
+        num_fixed_cols = len(column_names) - 1
+
+        for row_str in all_data_rows_raw:
+            # Split the string by whitespace, but only for the first `num_fixed_cols` times.
+            # This ensures that everything after the (num_fixed_cols)-th split goes into the last element,
+            # which is the 'description' column, preserving its internal spaces.
+            parts = row_str.split(maxsplit=num_fixed_cols)
+
+            # Ensure the number of parts matches the expected number of columns
+            if len(parts) == len(column_names):
+                parsed_data.append(parts)
+            else:
+                # This warning helps identify malformed rows if any
+                print(f"[WARN] Skipping malformed row (incorrect number of columns): {row_str}")
+
+        if not parsed_data:
+            print(f"[WARN] No successfully parsed data rows for {subdir_path}, skipping.")
             continue
 
-
-        # Parse the merged data into a pandas DataFrame
-        try:
-            # The header line needs to be properly split to get column names
-            column_names = re.split(r'\s+', merged_lines[0].replace('SCORE:', '').strip())
-            # Read the data, skipping the header line and using the parsed column names
-            # Changed delim_whitespace to sep='\s+'
-            df = pd.read_csv(merged_path, skiprows=1, sep='\s+', names=column_names)
-        except Exception as e:
-            print(f"[ERROR] Could not parse merged file {merged_path} into DataFrame: {e}, skipping {subdir}.")
-            os.remove(merged_path) # Clean up temp file
-            continue
+        # Create DataFrame from the parsed data and column names
+        df = pd.DataFrame(parsed_data, columns=column_names)
 
         # Define required columns, now including 'I_sc'
         required_cols = ['rms', 'total_score', 'dG_cross', 'I_sc', 'description']
         if not all(col in df.columns for col in required_cols):
             missing_cols = [col for col in required_cols if col not in df.columns]
             print(f"[WARN] Missing required columns {missing_cols} in {subdir}, skipping.")
-            os.remove(merged_path) # Clean up temp file
             continue
 
         # Select required columns and convert to numeric, dropping NaNs
@@ -148,7 +148,6 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
 
         if df.empty:
             print(f"[WARN] No valid numeric data after cleaning for {subdir}, skipping plots and funnelness calculation.")
-            os.remove(merged_path) # Clean up temp file
             continue
 
         # --- Plotting function for reusability ---
@@ -159,7 +158,7 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             hist_x = plt.subplot(gs[0, :-1], sharex=scatter_ax)
             hist_y = plt.subplot(gs[1:, -1], sharey=scatter_ax)
 
-            cmap = sns.color_palette("rocket", as_cmap=True) # Changed colormap to 'rocket' from seaborn
+            cmap = sns.color_palette("rocket", as_cmap=True) # Colormap set to 'rocket' from seaborn
             
             # Use quantiles for normalization to handle outliers gracefully
             q_low = dataframe['total_score'].quantile(0.05)
@@ -198,13 +197,10 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             hist_y.tick_params(axis='y', labelleft=False, labelsize=10) # Adjust tick label size if needed
 
             # Add colorbar (legend) outside the main plot
-            cbar_ax = fig.add_subplot(gs[1:, -1], frameon=False) # Create an axes for the colorbar, slightly adjusting GridSpec
-            cbar_ax.set_xticks([]) # Remove ticks
-            cbar_ax.set_yticks([]) # Remove ticks
-
             # Manually position the colorbar to the right of the main scatter plot
-            # (adjusting the rightmost column for this)
-            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), cax=fig.add_axes([0.92, 0.25, 0.02, 0.5]), # [left, bottom, width, height]
+            # [left, bottom, width, height] in figure coordinates (0 to 1)
+            cbar_ax = fig.add_axes([0.92, 0.25, 0.02, 0.5])
+            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), cax=cbar_ax,
                                 label='Total Score', orientation='vertical')
             cbar.set_label('Total Score', fontsize=12) # Adjust label font size
 
@@ -247,7 +243,7 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
         }])
 
         all_summaries.append(summary)
-        os.remove(merged_path) # Clean up the temporary merged file
+        # No need to remove merged_path here as it's not created anymore
 
     # Concatenate all individual summaries into one master summary CSV
     if all_summaries:
