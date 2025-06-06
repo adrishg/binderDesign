@@ -88,8 +88,8 @@ colabfold_batch \
     --templates \
     --custom-template-path "$TEMPLATE_PDB" \
     --model-type alphafold2_multimer_v3 \
-    --num-recycle 5 \
-    --num-seeds 3 \
+    --num-recycle 3 \
+    --num-seeds 2 \
     "$COMBINED_FASTA" "$OUTPUT_PATH"
 
 

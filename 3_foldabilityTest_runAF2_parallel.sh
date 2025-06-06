@@ -100,7 +100,7 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
     parallel -j $NUM_PARALLEL CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
         --msa-mode single_sequence \
         --num-recycle 3 \
-        --num-seed 3 \
+        --num-seed 2 \
         {} "$output_dir" ::: "$split_dir"/batch*.fa
 
 done
