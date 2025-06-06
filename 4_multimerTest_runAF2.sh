@@ -85,9 +85,4 @@ parallel -j $NUM_PARALLEL "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_
     --msa-mode single_sequence \
     --templates \
     --custom-template-path '$TEMPLATE_PDB' \
-    --model-type alphafold2_multimer_v3 \
-    --num-recycle 3 \
-    --num-seeds 3 \
-    {} '$OUTPUT_PATH'" ::: "$split_dir"/batch*.fa
-
-echo "Multimer modeling complete. Results saved to: $OUTPUT_PATH"
+    --model-type alphafold2_multimer_v3
