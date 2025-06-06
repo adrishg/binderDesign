@@ -141,6 +141,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
         model_seq_B, model_coords_B = extract_sequence_and_coords(model_path, "B")
         ref_seq_B, ref_coords_B = extract_sequence_and_coords(ref_path, "B")
+        #For later in csv
+        model_seq_A, model_coords_A = extract_sequence_and_coords(model_path, "A")
 
         align_result = align_by_sequence_and_kabsch(model_seq_B, model_coords_B, ref_seq_B, ref_coords_B)
         if isinstance(align_result, str):
@@ -184,7 +186,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         results.append({
             'backbone_id': backbone_id,
             'file': file,
-            'sequence': model_seq_B,
+            'sequence': model_seq_A,
             'rmsd_A': rmsd_A,
             'rmsd_B': rmsd_B,
             'iptm': iptm,
