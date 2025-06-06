@@ -11,58 +11,41 @@ source /share/yarovlab/ahgz/.bashrc
 conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
+NUM_PARALLEL=4  # default value
+
 print_usage() {
-    echo "Usage: sbatch $0 --fasta_file FASTA --output_path DIR --target_sequence SEQ --template_pdb PDB"
+    echo "Usage: sbatch $0 --fasta_file FASTA --output_path DIR --target_sequence SEQ --template_pdb PDB [--num-parallel N]"
     echo ""
     echo "Arguments:"
     echo "  --fasta_file        Path to binder FASTA file"
     echo "  --output_path       Output directory"
     echo "  --target_sequence   Target sequence string to append with ':'"
     echo "  --template_pdb      Template PDB file path"
+    echo "  --num-parallel      (Optional) Number of parallel jobs [default: 4]"
     echo "  --help              Show this help message and exit"
     exit 1
 }
 
-# Initialize variables
-FASTA_FILE=""
-OUTPUT_PATH=""
-TARGET_SEQUENCE=""
-TEMPLATE_PDB=""
-
-# Parse long arguments
+# Parse arguments
 while [[ $# -gt 0 ]]; do
-    key="$1"
-    case $key in
-        --fasta_file)
-            FASTA_FILE="$2"
-            shift; shift ;;
-        --output_path)
-            OUTPUT_PATH="$2"
-            shift; shift ;;
-        --target_sequence)
-            TARGET_SEQUENCE="$2"
-            shift; shift ;;
-        --template_pdb)
-            TEMPLATE_PDB="$2"
-            shift; shift ;;
-        --help)
-            print_usage ;;
-        *)
-            echo "Unknown option: $1"
-            print_usage ;;
+    case $1 in
+        --fasta_file) FASTA_FILE="$2"; shift 2;;
+        --output_path) OUTPUT_PATH="$2"; shift 2;;
+        --target_sequence) TARGET_SEQUENCE="$2"; shift 2;;
+        --template_pdb) TEMPLATE_PDB="$2"; shift 2;;
+        --num-parallel) NUM_PARALLEL="$2"; shift 2;;
+        --help) print_usage;;
+        *) echo "Unknown option: $1"; print_usage;;
     esac
 done
 
-# Validate required args
-if [[ -z "$FASTA_FILE" || -z "$OUTPUT_PATH" || -z "$TARGET_SEQUENCE" || -z "$TEMPLATE_PDB" ]]; then
-    echo "Missing required arguments."
-    print_usage
-fi
+[[ -z "$FASTA_FILE" || -z "$OUTPUT_PATH" || -z "$TARGET_SEQUENCE" || -z "$TEMPLATE_PDB" ]] && print_usage
 
 mkdir -p "$OUTPUT_PATH"
 COMBINED_FASTA="$OUTPUT_PATH/input_multimer_with_target.fasta"
 > "$COMBINED_FASTA"
 
+# Append target sequence to each entry
 echo "Preparing combined FASTA with original headers..."
 current_seq=""
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -76,21 +59,29 @@ while IFS= read -r line || [[ -n "$line" ]]; do
         current_seq+="$line"
     fi
 done < "$FASTA_FILE"
-
-# Final sequence
 if [[ -n "$current_seq" ]]; then
     echo "${current_seq}:${TARGET_SEQUENCE}" >> "$COMBINED_FASTA"
 fi
 
-echo "Running ColabFold multimer..."
-colabfold_batch \
+# Split combined FASTA for parallelization
+echo "Splitting into $NUM_PARALLEL batches..."
+split_dir="$OUTPUT_PATH/split_batches"
+mkdir -p "$split_dir"
+awk -v n=$NUM_PARALLEL -v out="$split_dir/batch" '
+    /^>/ {if (seq) print seq > (out file_count ".fa"); file_count = (file_count+1)%n; print > (out file_count ".fa"); seq=""}
+    !/^>/ {seq=seq $0}
+    END {if (seq) print seq > (out file_count ".fa")}
+' "$COMBINED_FASTA"
+
+# Run in parallel
+echo "Launching $NUM_PARALLEL parallel ColabFold multimer jobs..."
+parallel -j $NUM_PARALLEL CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
     --msa-mode single_sequence \
     --templates \
     --custom-template-path "$TEMPLATE_PDB" \
     --model-type alphafold2_multimer_v3 \
     --num-recycle 3 \
-    --num-seeds 2 \
-    "$COMBINED_FASTA" "$OUTPUT_PATH"
+    --num-seeds 3 \
+    {} "$OUTPUT_PATH" ::: "$split_dir"/batch*.fa
 
-
-echo " Multimer modeling complete. Results saved to: $OUTPUT_PATH"
+echo "Multimer modeling complete. Results saved to: $OUTPUT_PATH"
