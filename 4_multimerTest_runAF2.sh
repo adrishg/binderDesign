@@ -80,7 +80,7 @@ echo "Using GPU: $CUDA_VISIBLE_DEVICES"
 
 # Run in parallel
 echo "Launching $NUM_PARALLEL parallel ColabFold multimer jobs..."
-parallel --delay 2 -j "$NUM_PARALLEL" "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
+parallel -j $NUM_PARALLEL "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
     --msa-mode single_sequence \
     --templates \
     --custom-template-path '$TEMPLATE_PDB' \
