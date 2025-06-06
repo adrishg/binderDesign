@@ -73,10 +73,11 @@ awk -v n=$NUM_PARALLEL -v out="$split_dir/batch" '
     END {if (seq) print seq > (out file_count ".fa")}
 ' "$COMBINED_FASTA"
 
-export CUDA_VISIBLE_DEVICES=$SLURM_JOB_GPUS
+export CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES 
 export JAX_PLATFORM_NAME=cuda
 
-echo "Using GPU: $CUDA_VISIBLE_DEVICES"
+echo "Using GPU: $SLURM_JOB_GPUS"
+echo "GPU sees the GPU as: $CUDA_VISIBLE_DEVICES"
 
 # Run in parallel
 echo "Launching $NUM_PARALLEL parallel ColabFold multimer jobs..."
