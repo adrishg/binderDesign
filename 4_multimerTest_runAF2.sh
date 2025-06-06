@@ -74,11 +74,13 @@ awk -v n=$NUM_PARALLEL -v out="$split_dir/batch" '
 ' "$COMBINED_FASTA"
 
 export CUDA_VISIBLE_DEVICES=$SLURM_JOB_GPUS
+export JAX_PLATFORM_NAME=cuda
+
 echo "Using GPU: $CUDA_VISIBLE_DEVICES"
 
 # Run in parallel
 echo "Launching $NUM_PARALLEL parallel ColabFold multimer jobs..."
-parallel -j "$NUM_PARALLEL" "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
+parallel --delay 2 -j "$NUM_PARALLEL" "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
     --msa-mode single_sequence \
     --templates \
     --custom-template-path '$TEMPLATE_PDB' \
