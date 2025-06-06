@@ -73,15 +73,18 @@ awk -v n=$NUM_PARALLEL -v out="$split_dir/batch" '
     END {if (seq) print seq > (out file_count ".fa")}
 ' "$COMBINED_FASTA"
 
+export CUDA_VISIBLE_DEVICES=$SLURM_JOB_GPUS
+echo "Using GPU: $CUDA_VISIBLE_DEVICES"
+
 # Run in parallel
 echo "Launching $NUM_PARALLEL parallel ColabFold multimer jobs..."
-parallel -j $NUM_PARALLEL CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
+parallel -j "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
     --msa-mode single_sequence \
     --templates \
-    --custom-template-path "$TEMPLATE_PDB" \
+    --custom-template-path '$TEMPLATE_PDB' \
     --model-type alphafold2_multimer_v3 \
     --num-recycle 3 \
     --num-seeds 3 \
-    {} "$OUTPUT_PATH" ::: "$split_dir"/batch*.fa
+    {} '$OUTPUT_PATH'" ::: "$split_dir"/batch*.fa
 
 echo "Multimer modeling complete. Results saved to: $OUTPUT_PATH"

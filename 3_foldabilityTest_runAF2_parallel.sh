@@ -96,11 +96,19 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
     ' "$processed_fasta"
 
     # Step 3: Run in parallel
+
+    export CUDA_VISIBLE_DEVICES=$SLURM_JOB_GPUS
+    echo "Assigned SLURM_JOB_GPUS: $SLURM_JOB_GPUS"
+    echo "Exported CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
+    nvidia-smi
+
+    # Step 3: Run in parallel
     echo "Launching $NUM_PARALLEL parallel ColabFold jobs for $base_name"
-    parallel -j $NUM_PARALLEL CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
+    parallel -j $NUM_PARALLEL "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
         --msa-mode single_sequence \
         --num-recycle 3 \
         --num-seed 2 \
-        {} "$output_dir" ::: "$split_dir"/batch*.fa
+        {} '$output_dir'" ::: "$split_dir"/batch*.fa
+
 
 done
