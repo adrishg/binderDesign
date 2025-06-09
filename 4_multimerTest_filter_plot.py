@@ -187,7 +187,32 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         print("No results to process.")
         return
 
-    # (robust filtering logic unchanged)
+    print(f"Total models: {len(df)}, Passed models: {df['passed'].sum()}")
+
+    if robust:
+        sequence_stats = df.groupby(['backbone_id']).agg(
+            total_models=('passed', 'size'),
+            passed_models=('passed', 'sum')
+        ).reset_index()
+        passed_backbones = sequence_stats[sequence_stats['passed_models'] >= min_passed]
+        if not passed_backbones.empty:
+            filtered_df = df[df['backbone_id'].isin(passed_backbones['backbone_id']) & (df['passed'] == True)]
+            filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+            for _, row in filtered_df.iterrows():
+                model_file_path = os.path.join(af_models, row['file'])
+                shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
+        else:
+            pd.DataFrame().to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+    else:
+        filtered_df = df[df['passed'] == True]
+        filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+        for _, row in filtered_df.iterrows():
+            model_file_path = os.path.join(af_models, row['file'])
+            shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
+
+    with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
+        for _, row in filtered_df.iterrows():
+            f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
 
     # --- Updated plotting logic ---
     available_cols = set(df.columns)
@@ -221,7 +246,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
                 cbar.set_label(color_col, fontsize=12)
 
             if show_green_circles and 'passed' in df.columns:
-                passed_df = df[df['passed']]
+                passed_df = df[df['passed'] == True]
                 plt.scatter(passed_df[x_col], passed_df[y_col],
                             c='none', edgecolors='g', linewidth=2, s=100)
 
@@ -234,6 +259,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
             print(f"Saved plot to {plot_path}")
     else:
         print(f"Not enough data to plot. Found columns: {present_cols}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze multimer models")
