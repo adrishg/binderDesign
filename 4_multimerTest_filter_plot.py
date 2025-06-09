@@ -20,8 +20,8 @@ three_to_one = {
     'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
 }
 
-def extract_backbone_id_from_filename(filename):
-    match = re.search(r"__([0-9]+)_", filename)
+def extract_backbone_id_seq_from_filename(filename):
+    match = re.search(r"__([0-9]+_[0-9]+)", filename)
     return f"_{match.group(1)}" if match else None
 
 def extract_iptm(json_path):
@@ -137,10 +137,10 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
             continue
         print(f"\nProcessing: {file}")
         model_path = os.path.join(af_models, file)
-        backbone_id = extract_backbone_id_from_filename(file)
-        if not backbone_id:
+        backbone_id_seq = extract_backbone_id_seq_from_filename(file)
+        if not backbone_id_seq:
             continue
-        ref_path = os.path.join(rfdiff_backbones, f"{backbone_id}.pdb")
+        ref_path = os.path.join(rfdiff_backbones, f"{backbone_id_seq}.pdb")
         if not os.path.exists(ref_path):
             continue
 
@@ -150,18 +150,18 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
         align_result = align_by_sequence_and_kabsch(model_seq_B, model_coords_B, ref_seq_B, ref_coords_B)
         if isinstance(align_result, str):
-            results.append({'backbone_id': backbone_id, 'file': file, 'error': align_result, 'passed': False})
+            results.append({'backbone_id_seq': backbone_id_seq, 'file': file, 'error': align_result, 'passed': False})
             continue
 
         R, center_model, center_ref, matched_B, rmsd_B = align_result
         if rmsd_B > rmsd_B_threshold:
-            results.append({'backbone_id': backbone_id, 'file': file,
+            results.append({'backbone_id_seq': backbone_id_seq, 'file': file,
                             'error': f"Chain B RMSD too high: {rmsd_B:.2f}", 'passed': False})
             continue
 
         rmsd_A, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
         if isinstance(rmsd_A, str):
-            results.append({'backbone_id': backbone_id, 'file': file, 'error': rmsd_A, 'passed': False})
+            results.append({'backbone_id_seq': backbone_id_seq, 'file': file, 'error': rmsd_A, 'passed': False})
             continue
 
         json_file = re.sub("unrelaxed", "scores", file).replace(".pdb", ".json")
@@ -174,7 +174,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold and iptm is not None and iptm > iptm_threshold)
 
         results.append({
-            'backbone_id': backbone_id, 'file': file, 'sequence': model_seq_A,
+            'backbone_id_seq': backbone_id_seq, 'file': file, 'sequence': model_seq_A,
             'rmsd_A': rmsd_A, 'rmsd_B': rmsd_B, 'iptm': iptm,
             'plddt': avg_plddt, 'used_CA_chainA': matched_A, 'used_CA_chainB': matched_B,
             'passed': passed
@@ -190,13 +190,13 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
     print(f"Total models: {len(df)}, Passed models: {df['passed'].sum()}")
 
     if robust:
-        sequence_stats = df.groupby(['backbone_id']).agg(
+        sequence_stats = df.groupby(['backbone_id_seq']).agg(
             total_models=('passed', 'size'),
             passed_models=('passed', 'sum')
         ).reset_index()
         passed_backbones = sequence_stats[sequence_stats['passed_models'] >= min_passed]
         if not passed_backbones.empty:
-            filtered_df = df[df['backbone_id'].isin(passed_backbones['backbone_id']) & (df['passed'] == True)]
+            filtered_df = df[df['backbone_id_seq'].isin(passed_backbones['backbone_id_seq']) & (df['passed'] == True)]
             filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
             for _, row in filtered_df.iterrows():
                 model_file_path = os.path.join(af_models, row['file'])
@@ -212,7 +212,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
     with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
         for _, row in filtered_df.iterrows():
-            f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
+            f.write(f">{row['backbone_id_seq']}_{row['file']}\n{row['sequence']}\n")
 
     # --- Updated plotting logic ---
     available_cols = set(df.columns)
