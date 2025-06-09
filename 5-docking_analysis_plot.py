@@ -219,7 +219,7 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
 
         summary = pd.DataFrame([{
             "project": project_name,
-            "backbone_seq": subdir,
+            "backbone_id_seq": subdir,
             "lowest_dG_cross_pose": dg_row['description'],
             "lowest_dG_cross_value": dg_row['dG_cross'],
             "rmsd_of_lowest_dG_cross": dg_row['rms'],
