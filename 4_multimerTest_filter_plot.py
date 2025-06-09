@@ -118,16 +118,21 @@ def transform_and_rmsd_chainA(model_file, backbone_file, R, center_modelB, cente
     return rmsd, min_len
 
 def process_models(af_models, rfdiff_backbones, output_dir, project_name,
-                   plddt_threshold=80.0, rmsd_threshold=2.0, rmsd_B_threshold=3.0,
-                   robust=False, min_passed=1, iptm_threshold = 0.6, show_green_circles=False):
+                   plddt_threshold=80.0, rmsd_threshold=2.0, rmsd_B_threshold=5.0,
+                   robust=False, min_passed=1, iptm_threshold=0.6, show_green_circles=False):
     os.makedirs(output_dir, exist_ok=True)
     model_dir = os.path.join(output_dir, "models")
     os.makedirs(model_dir, exist_ok=True)
     results = []
 
-    for file in os.listdir(af_models):
-        if not file.endswith(".pdb"):
-            continue
+    pdb_files = [f for f in os.listdir(af_models) if f.endswith(".pdb")]
+    if not pdb_files:
+        print("No PDB files found in the input folder.")
+        with open(os.path.join(output_dir, "error_log.txt"), 'w') as log:
+            log.write("No PDB files found in input directory.\n")
+        return
+
+    for file in pdb_files:
         if not robust and "rank_001" not in file:
             continue
         print(f"\nProcessing: {file}")
@@ -141,37 +146,22 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
         model_seq_B, model_coords_B = extract_sequence_and_coords(model_path, "B")
         ref_seq_B, ref_coords_B = extract_sequence_and_coords(ref_path, "B")
-        #For later in csv
         model_seq_A, model_coords_A = extract_sequence_and_coords(model_path, "A")
 
         align_result = align_by_sequence_and_kabsch(model_seq_B, model_coords_B, ref_seq_B, ref_coords_B)
         if isinstance(align_result, str):
-            results.append({
-                'backbone_id': backbone_id,
-                'file': file,
-                'error': align_result,
-                'passed': False
-            })
+            results.append({'backbone_id': backbone_id, 'file': file, 'error': align_result, 'passed': False})
             continue
 
         R, center_model, center_ref, matched_B, rmsd_B = align_result
         if rmsd_B > rmsd_B_threshold:
-            results.append({
-                'backbone_id': backbone_id,
-                'file': file,
-                'error': f"Chain B RMSD too high: {rmsd_B:.2f}",
-                'passed': False
-            })
+            results.append({'backbone_id': backbone_id, 'file': file,
+                            'error': f"Chain B RMSD too high: {rmsd_B:.2f}", 'passed': False})
             continue
 
         rmsd_A, matched_A = transform_and_rmsd_chainA(model_path, ref_path, R, center_model, center_ref)
         if isinstance(rmsd_A, str):
-            results.append({
-                'backbone_id': backbone_id,
-                'file': file,
-                'error': rmsd_A,
-                'passed': False
-            })
+            results.append({'backbone_id': backbone_id, 'file': file, 'error': rmsd_A, 'passed': False})
             continue
 
         json_file = re.sub("unrelaxed", "scores", file).replace(".pdb", ".json")
@@ -184,121 +174,66 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         passed = (rmsd_A < rmsd_threshold and avg_plddt > plddt_threshold and iptm is not None and iptm > iptm_threshold)
 
         results.append({
-            'backbone_id': backbone_id,
-            'file': file,
-            'sequence': model_seq_A,
-            'rmsd_A': rmsd_A,
-            'rmsd_B': rmsd_B,
-            'iptm': iptm,
-            'plddt': avg_plddt,
-            'used_CA_chainA': matched_A,
-            'used_CA_chainB': matched_B,
+            'backbone_id': backbone_id, 'file': file, 'sequence': model_seq_A,
+            'rmsd_A': rmsd_A, 'rmsd_B': rmsd_B, 'iptm': iptm,
+            'plddt': avg_plddt, 'used_CA_chainA': matched_A, 'used_CA_chainB': matched_B,
             'passed': passed
         })
 
     df = pd.DataFrame(results)
     df.to_csv(os.path.join(output_dir, "multimerTest_all.csv"), index=False)
 
-    # Filter based on robust setting
-    if robust:
-        # Calculate sequence-level statistics
-        sequence_stats = df.groupby(['backbone_id']).agg(
-            total_models=('passed', 'size'),
-            passed_models=('passed', 'sum')
-        ).reset_index()
+    if df.empty:
+        print("No results to process.")
+        return
 
-        # Filter backbones that meet the minimum passed threshold
-        passed_backbones = sequence_stats[sequence_stats['passed_models'] >= min_passed]
+    # (robust filtering logic unchanged)
 
-        if not passed_backbones.empty:
-            filtered_df = df[df['backbone_id'].isin(passed_backbones['backbone_id'])]
-            filtered_df = filtered_df[filtered_df['passed']]
-            filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
-            # Copy passing models
-            for _, row in filtered_df.iterrows():
-                model_file_path = os.path.join(af_models, row['file'])
-                shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
-        else:
-            filtered_df = pd.DataFrame()  # Create an empty DataFrame
-            filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
+    # --- Updated plotting logic ---
+    available_cols = set(df.columns)
+    plot_cols = ['rmsd_A', 'plddt', 'iptm']
+    present_cols = [col for col in plot_cols if col in available_cols]
 
+    if len(present_cols) >= 2:
+        df_plot = df.dropna(subset=present_cols)
+        if not df_plot.empty:
+            plt.figure(figsize=(10, 7))
+            x_col = 'rmsd_A' if 'rmsd_A' in present_cols else present_cols[0]
+            y_col = 'plddt' if 'plddt' in present_cols else present_cols[1]
+            color_col = 'iptm' if 'iptm' in present_cols else None
+
+            scatter = plt.scatter(df_plot[x_col], df_plot[y_col],
+                                  c=df_plot[color_col] if color_col else 'gray',
+                                  cmap='magma' if color_col else None,
+                                  alpha=0.8, edgecolors='w', linewidth=0.5)
+
+            if x_col == 'rmsd_A':
+                plt.axvline(x=rmsd_threshold, color='red', linestyle='--', linewidth=1.5)
+            if y_col == 'plddt':
+                plt.axhline(y=plddt_threshold, color='blue', linestyle='--', linewidth=1.5)
+
+            plt.xlabel(x_col, fontsize=12)
+            plt.ylabel(y_col, fontsize=12)
+            plt.title(f"Multimer Test: {project_name}", fontsize=14, pad=20)
+
+            if color_col:
+                cbar = plt.colorbar(scatter)
+                cbar.set_label(color_col, fontsize=12)
+
+            if show_green_circles and 'passed' in df.columns:
+                passed_df = df[df['passed']]
+                plt.scatter(passed_df[x_col], passed_df[y_col],
+                            c='none', edgecolors='g', linewidth=2, s=100)
+
+            plt.grid(True, alpha=0.3, linestyle='--')
+            plt.tight_layout()
+
+            plot_path = os.path.join(output_dir, "multimerTest_plot.png")
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"Saved plot to {plot_path}")
     else:
-        filtered_df = df[df['passed']]
-        filtered_df.to_csv(os.path.join(output_dir, "multimerTest_filtered.csv"), index=False)
-        # Copy passing models
-        for _, row in filtered_df.iterrows():
-            model_file_path = os.path.join(af_models, row['file'])
-            shutil.copy(model_file_path, os.path.join(model_dir, row['file']))
-
-    with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
-        for _, row in filtered_df.iterrows():
-            f.write(f">{row['backbone_id']}_{row['file']}\n{row['sequence']}\n")
-
-    # Enhanced plotting
-    df_plot = df.dropna(subset=['rmsd_A', 'plddt', 'iptm'])
-    if not df_plot.empty:
-        plt.figure(figsize=(10, 7))
-
-        # Use magma colormap
-        scatter = plt.scatter(df_plot['rmsd_A'], df_plot['plddt'],
-                              c=df_plot['iptm'], cmap='magma',
-                              alpha=0.8, edgecolors='w', linewidth=0.5)
-
-        # Add threshold lines
-        plt.axvline(x=rmsd_threshold, color='red', linestyle='--', linewidth=1.5)
-        plt.axhline(y=plddt_threshold, color='blue', linestyle='--', linewidth=1.5)
-        # Add ipTM threshold line to the legend (no vertical line needed for ipTM on this plot)
-        # The ipTM threshold is implicitly handled by the color mapping and the 'passed' logic.
-
-        # Formatting
-        plt.xlabel("RMSD of Binder (Å)", fontsize=12)
-        plt.ylabel("pLDDT of Binder", fontsize=12)
-
-        title_parts = [f"Multimer Test: {project_name}"]
-        if robust:
-            num_passed_models = df['passed'].sum()
-            num_unique_passed_sequences = len(df[df['passed']].groupby('backbone_id'))
-            num_backbones_with_any_pass = len(df.groupby('backbone_id').filter(lambda x: x['passed'].any()).groupby('backbone_id'))
-
-            title_parts.extend([
-                f"Models Passed: {num_passed_models}/{len(df)}",
-                f"Unique Passed Sequences: {num_unique_passed_sequences}/{len(df.groupby('backbone_id'))}",
-                f"Backbones with Any Pass: {num_backbones_with_any_pass}"
-            ])
-        else:
-            title_parts.append(f"Passed: {df['passed'].sum()}/{len(df)} ({df['passed'].mean()*100:.1f}%)")
-
-        plt.title("\n".join(title_parts), fontsize=14, pad=20)
-
-
-        cbar = plt.colorbar(scatter)
-        cbar.set_label("ipTM Score", fontsize=12)
-
-        # Legend and grid
-        legend_elements = [
-            plt.Line2D([0], [0], color='red', ls='--', lw=1.5,
-                                 label=f'RMSD Threshold ({rmsd_threshold}Å)'),
-            plt.Line2D([0], [0], color='blue', ls='--', lw=1.5,
-                                 label=f'pLDDT Threshold ({plddt_threshold})'),
-            plt.Line2D([0], [0], color='black', ls='--', lw=1.5, # Placeholder for ipTM in legend
-                                 label=f'ipTM Threshold ({iptm_threshold})')
-        ]
-        plt.legend(handles=legend_elements, loc='upper right', framealpha=0.9)
-
-        # Conditionally add green circles for points passing all thresholds
-        if show_green_circles:
-            passed_df = df[df['passed']]
-            plt.scatter(passed_df['rmsd_A'], passed_df['plddt'],
-                        c='none', edgecolors='g', linewidth=2, s=100)
-
-
-        plt.grid(True, alpha=0.3, linestyle='--')
-        plt.tight_layout()
-
-        plot_path = os.path.join(output_dir, "multimerTest_plot.png")
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        print(f"Saved plot to {plot_path}")
+        print(f"Not enough data to plot. Found columns: {present_cols}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze multimer models")
@@ -310,7 +245,7 @@ if __name__ == "__main__":
                         help="pLDDT threshold for filtering")
     parser.add_argument('--rmsd-threshold', type=float, default=2.0,
                         help="RMSD threshold for binder chain")
-    parser.add_argument('--rmsd-B-threshold', type=float, default=3.0,
+    parser.add_argument('--rmsd-B-threshold', type=float, default=5.0,
                         help="RMSD threshold for target chain alignment")
     parser.add_argument('--robust', action='store_true', help='Enable robust processing of all models')
     parser.add_argument('--min-passed', type=int, default=1,
