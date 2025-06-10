@@ -161,7 +161,7 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
    --output-csv "$project_path/6-ExtraMetrics/sap.csv"
 
 #6.4.2: other metrics
-sbatch /share/yarovlab/ahgz/scripts/binderDesign/6_3_runMultimerMetrics.sh \
+sbatch /share/yarovlab/ahgz/scripts/binderDesign/6_3_runMetricsMultimer.sh \
   --input_pdb "$project_path/4-MultimerTest/multimer_results/models/*.pdb" \
   --scorefile "$project_path/6-ExtraMetrics/metris.sc"
 
