@@ -22,7 +22,7 @@ three_to_one = {
 
 def extract_backbone_id_seq_from_filename(filename):
     match = re.search(r"__([0-9]+_[0-9]+)_", filename)
-    return f"_{match.group(1)}" if match else None
+    return match.group(1) if match else None
 
 def extract_iptm(json_path):
     if not os.path.isfile(json_path):
@@ -214,7 +214,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
     with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
         for _, row in filtered_df.iterrows():
-            f.write(f">{row['backbone_id_seq']}_{row['file']}\n{row['sequence']}\n")
+            f.write(f">_{row['backbone_id_seq']}_{row['file']}\n{row['sequence']}\n")
 
     # --- Updated plotting logic ---
     available_cols = set(df.columns)
