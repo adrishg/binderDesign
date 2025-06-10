@@ -142,7 +142,7 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
             print(f"Could not extract backbone_id_seq from: {file}")
             continue
         backbone_id = backbone_id_seq.split('_')[0]
-        ref_path = os.path.join(rfdiff_backbones, f"{backbone_id}.pdb")
+        ref_path = os.path.join(rfdiff_backbones, f"_{backbone_id}.pdb")
         if not os.path.exists(ref_path):
             print(f"Reference backbone missing: {ref_path}")
             continue
