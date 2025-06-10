@@ -141,7 +141,8 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         if not backbone_id_seq:
             print(f"Could not extract backbone_id_seq from: {file}")
             continue
-        ref_path = os.path.join(rfdiff_backbones, f"{backbone_id_seq}.pdb")
+        backbone_id = backbone_id_seq.split('_')[0]
+        ref_path = os.path.join(rfdiff_backbones, f"{backbone_id}.pdb")
         if not os.path.exists(ref_path):
             print(f"Reference backbone missing: {ref_path}")
             continue
@@ -214,7 +215,11 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
 
     with open(os.path.join(output_dir, "passed_binders.fasta"), 'w') as f:
         for _, row in filtered_df.iterrows():
-            f.write(f">_{row['backbone_id_seq']}_{row['file']}\n{row['sequence']}\n")
+            header = f">_{row['backbone_id_seq']}_{row['file']}"
+            sequence = row['sequence']
+            f.write(
+    f"{header}\n{sequence}\n"
+)
 
     # --- Updated plotting logic ---
     available_cols = set(df.columns)
