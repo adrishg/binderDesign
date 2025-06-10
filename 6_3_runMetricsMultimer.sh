@@ -61,12 +61,16 @@ if [[ -z "$input_pdb" || -z "$scorefile" ]]; then
     print_usage
 fi
 
+# Expand wildcard and create file list
+input_list="input_pdb_list.txt"
+eval ls $input_pdb > "$input_list"
+
 rosetta_execute=/share/yarovlab/ahgz/apps/rosetta/rosetta.source.release-371/main/source/bin/rosetta_scripts.linuxgccrelease
 rosetta_database=/share/yarovlab/ahgz/apps/rosetta/rosetta.source.release-371/main/database
 
 $rosetta_execute \
     -in:path:database "$rosetta_database" \
-    -in:file:s "$input_pdb" \
+    -in:file:l "$input_list" \
     -parser:protocol "$xml_protocol" \
     -corrections:beta_nov16 \
     -out:file:scorefile "$scorefile" \

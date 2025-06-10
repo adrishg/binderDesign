@@ -14,7 +14,7 @@ print_usage() {
     echo "Arguments:"
     echo "  --input_pdb         Path to input PDB files (can include wildcards)"
     echo "  --scorefile         Path to output scorefile"
-    echo "  --xml_protocol      (Optional) Path to Rosetta XML protocol file [default: /share/yarovlab/ahgz/Binders/Cav12_bSubunit_denovo/sap.xml]"
+    echo "  --xml_protocol      (Optional) Path to Rosetta XML protocol file [default: /share/yarovlab/ahgz/scripts/binderDesign/sap.xml]"
     echo "  --silent_output     (Optional) Path to silent output file [default: sap.silent]"
     echo "  --help              Show this help message and exit"
     exit 1
@@ -61,12 +61,16 @@ if [[ -z "$input_pdb" || -z "$scorefile" ]]; then
     print_usage
 fi
 
+# Expand wildcard and create file list
+input_list="input_pdb_list.txt"
+eval ls $input_pdb > "$input_list"
+
 rosetta_execute=/share/yarovlab/ahgz/apps/rosetta/rosetta.source.release-371/main/source/bin/rosetta_scripts.linuxgccrelease
 rosetta_database=/share/yarovlab/ahgz/apps/rosetta/rosetta.source.release-371/main/database
 
 $rosetta_execute \
     -in:path:database "$rosetta_database" \
-    -in:file:s "$input_pdb" \
+    -in:file:l "$input_list" \
     -out:file:scorefile "$scorefile" \
     -parser:protocol "$xml_protocol" \
     -out:file:silent "$silent_output" \

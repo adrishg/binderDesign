@@ -142,17 +142,20 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/5-docking_analysis_plot.py \
 #Step 6: Extra Metrics
 #Part 6.1: Gather monomer models
 python3 /share/yarovlab/ahgz/scripts/binderDesign/6_1_getMonomerModels.py \
-   --csv-file "$project_path/docking_results/summary_table.csv" \
+   --csv-file "$project_path/5-Docking/docking_results/summary_table.csv" \
    --id-column "backbone_id_seq" \
    --input-dir "$project_path/3-FoldabilityTest/af2_output/" \
    --output-dir "$project_path/6-ExtraMetrics/monomerInputs"
 
 #Part 6.2: Run SAP for monomer
-sbatch /share/yarovlab/ahgz/scripts/binderDesign/6_2_runSAP.sh \
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/6_2_runSAP.sh \
   --input_pdb "$project_path/6-ExtraMetrics/monomerInputs/*.pdb" \
   --scorefile "$project_path/6-ExtraMetrics/sap.sc"
 
 #Part 6.3: Run Extra metrics (SAP binder from multimer, CMS)
+sbatch  --wait /share/yarovlab/ahgz/scripts/binderDesign/6_3_runMetricsMultimer.sh \
+  --input_pdb "$project_path/4-MultimerTest/multimer_results/models/*.pdb" \
+  --scorefile "$project_path/6-ExtraMetrics/metris.sc"
 
 #Part 6.4: Scorefiles to CSVs
 #6.4.1: sap
@@ -161,9 +164,10 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
    --output-csv "$project_path/6-ExtraMetrics/sap.csv"
 
 #6.4.2: other metrics
-sbatch /share/yarovlab/ahgz/scripts/binderDesign/6_3_runMetricsMultimer.sh \
-  --input_pdb "$project_path/4-MultimerTest/multimer_results/models/*.pdb" \
-  --scorefile "$project_path/6-ExtraMetrics/metris.sc"
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
+   --input-score-path "$project_path/6-ExtraMetrics/metrics.sc" \
+   --output-csv "$project_path/6-ExtraMetrics/metrics.csv"
+
 
 #Part 6.5: Merge CSVs
 #6.5.1: Multimer with Docking
