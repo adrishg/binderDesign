@@ -21,7 +21,7 @@ three_to_one = {
 }
 
 def extract_backbone_id_seq_from_filename(filename):
-    match = re.search(r"__([0-9]+_[0-9]+)", filename)
+    match = re.search(r"__([0-9]+_[0-9]+)_", filename)
     return f"_{match.group(1)}" if match else None
 
 def extract_iptm(json_path):
@@ -139,9 +139,11 @@ def process_models(af_models, rfdiff_backbones, output_dir, project_name,
         model_path = os.path.join(af_models, file)
         backbone_id_seq = extract_backbone_id_seq_from_filename(file)
         if not backbone_id_seq:
+            print(f"Could not extract backbone_id_seq from: {file}")
             continue
         ref_path = os.path.join(rfdiff_backbones, f"{backbone_id_seq}.pdb")
         if not os.path.exists(ref_path):
+            print(f"Reference backbone missing: {ref_path}")
             continue
 
         model_seq_B, model_coords_B = extract_sequence_and_coords(model_path, "B")

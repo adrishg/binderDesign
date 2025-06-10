@@ -252,4 +252,4 @@ if __name__ == "__main__":
     parser.add_argument("--results-dir", required=True, help="Path to output folder for plots and CSVs.")
     args = parser.parse_args()
 
-    create_colored_scatter_plot_for_all(args.input_dir, args.project_name, args.results_dir)
+    create_colored_scatter_plot_for_all(args.input_dir, args.project_name, args.results_di
