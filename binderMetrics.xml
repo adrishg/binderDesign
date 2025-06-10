@@ -1,0 +1,55 @@
+<ROSETTASCRIPTS>
+
+    <SCOREFXNS>
+        <ScoreFunction name="sfxn" weights="beta_nov16" />
+    </SCOREFXNS>
+
+    <RESIDUE_SELECTORS>
+        <Chain name="receptor" chains="A"/>
+        <Chain name="binder" chains="B"/>
+        <Neighborhood name="interface_receptor" selector="binder" distance="10.0" />
+        <Neighborhood name="interface_binder" selector="receptor" distance="10.0" />
+        <And name="AB_interface" selectors="interface_receptor,interface_binder" />
+        <And name="actual_interface_receptor" selectors="AB_interface,receptor" />
+        <And name="actual_interface_binder" selectors="AB_interface,binder" />
+        <ResidueName name="apolar" residue_name3="ALA,CYS,PHE,ILE,LEU,MET,THR,PRO,VAL,TRP,TYR" />
+        <And name="apolar_receptor" selectors="apolar,actual_interface_receptor" />
+        <And name="apolar_binder" selectors="apolar,actual_interface_binder" />
+        <True name="true_sel" />
+    </RESIDUE_SELECTORS>
+
+    <FILTERS>
+        <ContactMolecularSurface name="contact_molecular_surface" distance_weight="0.5"
+            target_selector="receptor" binder_selector="binder" confidence="0" />
+    </FILTERS>
+
+    <SIMPLE_METRICS>
+        <SapScoreMetric name="sap_score" score_selector="binder" />
+        <SapScoreMetric name="sap_score_target" score_selector="receptor" />
+        <SapScoreMetric name="binder_blocked_sap" score_selector="binder" sap_calculate_selector="binder" sasa_selector="true_sel" />
+        <SapScoreMetric name="target_blocked_sap" score_selector="receptor" sap_calculate_selector="receptor" sasa_selector="true_sel" />
+
+        <CalculatorMetric name="binder_delta_sap" equation="binder_sap_score - binder_blocked_sap" >
+            <VAR name="binder_sap_score" metric="sap_score"/>
+            <VAR name="binder_blocked_sap" metric="binder_blocked_sap"/>
+        </CalculatorMetric>
+
+        <CalculatorMetric name="target_delta_sap" equation="target_sap_score - target_blocked_sap" >
+            <VAR name="target_sap_score" metric="sap_score_target"/>
+            <VAR name="target_blocked_sap" metric="target_blocked_sap"/>
+        </CalculatorMetric>
+
+    </SIMPLE_METRICS>
+
+    <MOVERS>
+    </MOVERS>
+
+    <PROTOCOLS>
+        <Add filter="contact_molecular_surface" />
+        <Add metrics="sap_score" />
+        <Add metrics="sap_score_target" />
+        <Add metrics="binder_delta_sap" />
+        <Add metrics="target_delta_sap" />
+    </PROTOCOLS>
+
+</ROSETTASCRIPTS>

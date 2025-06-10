@@ -40,8 +40,8 @@ module load gcc/13.2.0
 
 # Set up project directory structure
 
-#project_path="./$project_name"
-mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesign,3-FoldabilityTest,4-MultimerTest,5-Docking,results}
+#project_path="./$project_name"s
+mkdir -p "$project_path"/{1-BackboneDesign,1.5-FilteringBackbones,2-SequenceDesign,3-FoldabilityTest,4-MultimerTest,5-Docking,6-ExtraMetrics,7-Ranking,results}
 
 # Step 1: Backbone DesignBackbone Design
 # --wait falg is neccessary in order to let the job end until starts the next step
@@ -63,7 +63,7 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/1-run_backboneDesign.sh 
 #Adding activating base environment here since step 1 activates RFDiffusion environment that lacks pandas so error
 conda activate base
 
-# Filter 1: Radious of gyration (ROG) and also calculates "sphericality" but only filtering by ROG
+# Filter 1.1: Radious of gyration (ROG) and also calculates "sphericality" but only filtering by ROG
 python3 /share/yarovlab/ahgz/scripts/binderDesign/1_1_filter_RoG.py \
     --input-dir "$project_path/1-BackboneDesign/T30/" \
     --chain A \
@@ -86,7 +86,7 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_ligandM
 
 
 # Step 3: Foldability Test of binder only
-# Part 1: actually running AF2 for all sequences, this is the slowest step in my experience
+# Part 3.1: actually running AF2 for all sequences, this is the slowest step in my experience
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2_monomer.sh \
     -s "$project_path/2-SequenceDesign/seqs/" \
     -a "$project_name" \
@@ -95,46 +95,104 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2
 conda activate base
 mkdir -p "$project_path"/3-FoldabilityTest/output_results/
 
-# Part 2: Filtering and making the plot, csv file and making copy of files that passes
+# Part 3.2: Filtering and making the plot, csv file and making copy of files that passes
 python3 /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_filter_plot.py \
     --af-models "$project_path/3-FoldabilityTest/af2_output/" \
     --rfdiff-backbones "$project_path/1.5-FilteringBackbones/visually_inspected/" \
-    --output-dir "$project_path/3-FoldabilityTest/output_results/" \
+    --output-dir "$project_path/3-FoldabilityTest/foldability_results/" \
     --plddt_threshold 90\
     --rmsd_threshold 2
 
 echo "Foldability test monomer completed for project: $project_name"
 
 # Step 4: Multimer test
-# Part 1: Submission to AF2 multimer, binder first so it will be A and target will be B
+# Part 4.1: Submission to AF2 multimer, binder first so it will be A and target will be B
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/4_multimerTest_runAF2.sh \
-  --fasta_file "$project_path/3-FoldabilityTest/output_results/filtered_passed_seqs.fasta" \
+  --fasta_file "$project_path/3-FoldabilityTest/foldability_results/filtered_passed_seqs.fasta" \
   --output_path "$project_path/4-MultimerTest/af2_output/" \
   --target_sequence "$target_seq" \
   --template_pdb "$project_path/templates/"
 
-#Part 2: Filtering multimer foldability test and making plot, there is also --robust version of this script
+#Part 4.2: Filtering multimer foldability test and making plot, there is also --robust version of this script
 python3 /share/yarovlab/ahgz/scripts/binderDesign/4_multimerTest_filter_plot.py \
     --af-models "$project_path/4-MultimerTest/af2_output/" \
     --rfdiff-backbones "$project_path/1.5-FilteringBackbones/visually_inspected/" \
-    --output-dir "$project_path/4-MultimerTest/output_results/" \
+    --output-dir "$project_path/4-MultimerTest/multimer_results/" \
     --plddt-threshold 85\
     --rmsd-threshold 3 \
 
 echo "Foldability test multimer filtering completed for project: $project_name"
 
 #Step 5: Docking binder-channel for each complex that passed the multimer test
-#Part 1: Submit and run all docking 1,000 poses each
+#Part 5.1: Submit and run all docking 1,000 poses each
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/5-docking_submit_all.sh \
-    --input-dir "$project_path/4-MultimerTest/output_results/models/"\
+    --input-dir "$project_path/4-MultimerTest/multimer_results/models/"\
     --output-dir "$project_path/5-Docking/"
 
-#Part 2: Analyze and make plots of docking results
+#Part 5.2: Analyze and make plots of docking results
 python3 /share/yarovlab/ahgz/scripts/binderDesign/5-docking_analysis_plot.py \
    --input-dir "$project_path/5-Docking/docking_outputs/"\
    --project-name "$project_name" \
-   --results-dir "$project_path/5-Docking/output_results"
+   --results-dir "$project_path/5-Docking/docking_results"
 
-#Part 3 substract lowest dG_cross and rmsd poses from silent_files 
+#Part 5.3 substract lowest dG_cross and rmsd poses from silent_files 
 
-#### testing it now!
+#### PENDING
+
+#Step 6: Extra Metrics
+#Part 6.1: Gather monomer models
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_1_getMonomerModels.py \
+   --csv-file "$project_path/docking_results/summary_table.csv" \
+   --id-column "backbone_id_seq" \
+   --input-dir "$project_path/3-FoldabilityTest/af2_output/" \
+   --output-dir "$project_path/6-ExtraMetrics/monomerInputs"
+
+#Part 6.2: Run SAP for monomer
+sbatch /share/yarovlab/ahgz/scripts/binderDesign/6_2_runSAP.sh \
+  --input_pdb "$project_path/6-ExtraMetrics/monomerInputs/*.pdb" \
+  --scorefile "$project_path/6-ExtraMetrics/sap.sc"
+
+#Part 6.3: Run Extra metrics (SAP binder from multimer, CMS)
+
+#Part 6.4: Scorefiles to CSVs
+#6.4.1: sap
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
+   --input-score-path "$project_path/6-ExtraMetrics/sap.sc" \
+   --output-csv "$project_path/6-ExtraMetrics/sap.csv"
+
+#6.4.2: other metrics
+sbatch /share/yarovlab/ahgz/scripts/binderDesign/6_3_runMultimerMetrics.sh \
+  --input_pdb "$project_path/4-MultimerTest/multimer_results/models/*.pdb" \
+  --scorefile "$project_path/6-ExtraMetrics/metris.sc"
+
+#Part 6.5: Merge CSVs
+#6.5.1: Multimer with Docking
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_5_merge_csvs.py \
+  --primary-csv "$project_path/4-MultimerTest/multimer_results/multimerTest_filtered.csv" \
+  --secondary-csv "$project_path/5-Docking/docking_results/summary_table.csv" \
+  --output-csv "$project_path/7-Ranking/multimer-docking_merged.csv" \
+  --ref-column backbone_id_seq \
+  --columns-to-merge "lowest_dG_cross_value" "rmsd_of_lowest_dG_cross" "funnelness_dG_cross" "lowest_rmsd_pose" "lowest_rmsd_value" "dG_cross_of_lowest_rmsd" "lowest_I_sc_value" "rmsd_of_lowest_I_sc" "funnelness_I_sc"
+
+#6.5.2: with SAP monomer
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_5_merge_csvs.py \
+  --primary-csv "$project_path/7-Ranking/multimer-docking_merged.csv" \
+  --secondary-csv "$project_path/6-ExtraMetrics/sap.csv" \
+  --output-csv "$project_path/7-Ranking/multimer-docking_sap_merged.csv" \
+  --ref-column backbone_id_seq \
+  --columns-to-merge "length" "sap_score" 
+
+#6.5.3: with SAP binder from multimer, CMS
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_5_merge_csvs.py \
+  --primary-csv "$project_path/7-Ranking/multimer-docking_sap_merged.csv" \
+  --secondary-csv "$project_path/6-ExtraMetrics/metrics.csv" \
+  --output-csv "$project_path/7-Ranking/final_merged.csv" \
+  --ref-column backbone_id_seq \
+  --columns-to-merge "binder_delta_sap" "contact_molecular_surface" "sap_score" 
+
+#Part 6.6: Normalize SAP?
+
+
+#Part 7: Ranking
+
+

@@ -1,0 +1,19 @@
+<ROSETTASCRIPTS>
+    <SCOREFXNS>
+    </SCOREFXNS>
+    <RESIDUE_SELECTORS>
+    </RESIDUE_SELECTORS>
+    <FILTERS>
+    <ResidueCount name="length" max_residue_count="200" min_residue_count="10" />
+    </FILTERS>
+    <SIMPLE_METRICS>
+        <SapScoreMetric name="sapscore"/>
+    </SIMPLE_METRICS>
+    <MOVERS>
+         <RunSimpleMetrics name="run_metrics1" metrics="sapscore"/>
+    </MOVERS>
+    <PROTOCOLS>
+        <Add mover_name="run_metrics1"/>
+        <Add filter_name="length"/>
+     </PROTOCOLS>
+</ROSETTASCRIPTS>
