@@ -192,7 +192,7 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/6_5_merge_csvs.py \
   --secondary-csv "$project_path/6-ExtraMetrics/metrics.csv" \
   --output-csv "$project_path/7-Ranking/final_merged.csv" \
   --ref-column backbone_id_seq \
-  --columns-to-merge "binder_delta_sap" "contact_molecular_surface" "sap_score" 
+  --columns-to-merge "binder_delta_sap" "contact_molecular_surface"
 
 #Part 6.6: Normalize SAP?
 
