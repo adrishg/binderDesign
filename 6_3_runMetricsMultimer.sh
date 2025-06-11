@@ -75,4 +75,5 @@ $rosetta_execute \
     -corrections:beta_nov16 \
     -out:file:scorefile "$scorefile" \
     -out:file:silent "$silent_output" \
-    -out:file:silent_struct_type binary
+    -out:file:silent_struct_type binary \
+    -overwrite

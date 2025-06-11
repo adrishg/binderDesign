@@ -74,4 +74,6 @@ $rosetta_execute \
     -out:file:scorefile "$scorefile" \
     -parser:protocol "$xml_protocol" \
     -out:file:silent "$silent_output" \
-    -out:file:silent_struct_type binary
+    -out:file:silent_struct_type binary \
+    -overwrite
+    
