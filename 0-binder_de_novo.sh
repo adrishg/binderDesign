@@ -93,7 +93,7 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2
     -o "$project_path/3-FoldabilityTest/af2_output/"
 
 conda activate base
-mkdir -p "$project_path"/3-FoldabilityTest/output_results/
+mkdir -p "$project_path"/3-FoldabilityTest/foldability_results/
 
 # Part 3.2: Filtering and making the plot, csv file and making copy of files that passes
 python3 /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_filter_plot.py \
@@ -104,6 +104,28 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_filter_plot.
     --rmsd_threshold 2
 
 echo "Foldability test monomer completed for project: $project_name"
+
+############################################################################################
+
+# Part 3.5 (NEW!): Filter monomers by SAP score
+#Part 6.2: Run SAP for monomer
+sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/6_2_runSAP.sh \
+  --input_pdb "$project_path/6-ExtraMetrics/monomerInputs/*.pdb" \
+  --scorefile "$project_path/6-ExtraMetrics/sap.sc"
+
+#Part 6.4: Scorefiles to CSVs
+#6.4.1: sap
+python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
+   --input-score-path "$project_path/6-ExtraMetrics/sap.sc" \
+   --output-csv "$project_path/6-ExtraMetrics/sap.csv"
+
+python3 filter_normalized_sap_and_copy.py \
+  --input_csv "$project_path/6-ExtraMetrics/sap.csv" \
+  --input_dir "$project_path/6-ExtraMetrics/monomerInputs" \
+  --output_dir "$project_path/6-ExtraMetrics/sapFiltered" \
+  --threshold-norm-sap 0.5
+
+############################################################################################
 
 # Step 4: Multimer test
 # Part 4.1: Submission to AF2 multimer, binder first so it will be A and target will be B
@@ -162,6 +184,11 @@ sbatch  --wait /share/yarovlab/ahgz/scripts/binderDesign/6_3_runMetricsMultimer.
 python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
    --input-score-path "$project_path/6-ExtraMetrics/sap.sc" \
    --output-csv "$project_path/6-ExtraMetrics/sap.csv"
+
+#Part 6.4.1: Normalize sap
+python3 normalize_sap_scores.py \
+  --input_csv "$project_path/6-ExtraMetrics/sap.csv" \
+  --output_csv "$project_path/6-ExtraMetrics/sap_normalized.csv"
 
 #6.4.2: other metrics
 python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
