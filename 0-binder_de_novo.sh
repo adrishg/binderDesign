@@ -166,7 +166,7 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/5-docking_analysis_plot.py \
 python3 /share/yarovlab/ahgz/scripts/binderDesign/6_1_getMonomerModels.py \
    --csv-file "$project_path/5-Docking/docking_results/summary_table.csv" \
    --id-column "backbone_id_seq" \
-   --input-dir "$project_path/3-FoldabilityTest/af2_output/" \
+   --input-dir "$project_path/3-FoldabilityTest/foldability_results/models/" \
    --output-dir "$project_path/6-ExtraMetrics/monomerInputs"
 
 #Part 6.2: Run SAP for monomer
@@ -186,7 +186,7 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
    --output-csv "$project_path/6-ExtraMetrics/sap.csv"
 
 #Part 6.4.1: Normalize sap
-python3 normalize_sap_scores.py \
+python3 /share/yarovlab/ahgz/scripts/binderDesign/normalize_sap.py \
   --input_csv "$project_path/6-ExtraMetrics/sap.csv" \
   --output_csv "$project_path/6-ExtraMetrics/sap_normalized.csv"
 

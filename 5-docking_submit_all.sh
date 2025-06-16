@@ -41,7 +41,7 @@ for pdb in "$input_dir"/*.pdb; do
     original_name=$(basename "$pdb" .pdb)
 
     # Extract "project__backbone_seq" from long name
-    if [[ "$original_name" =~ (.+__[^_]+_[^_]+) ]]; then
+    if [[ "$original_name" =~ (.+__[^.]+) ]]; then
         short_name="${BASH_REMATCH[1]}"
     else
         echo "[WARN] Skipping unrecognized name format: $original_name"
