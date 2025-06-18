@@ -104,7 +104,7 @@ def main(pdb_directory, chain='A', output_dir='output', rg_cutoff=0.15, project_
     results_df.to_csv(results_csv, index=False)
     print(f"Results saved to {results_csv}")
 
-    filtered_dir = os.path.join(output_dir, f"filtered_rog{suffix}")
+    filtered_dir = os.path.join(output_dir, f"filtered_normRog{suffix}")
     os.makedirs(filtered_dir, exist_ok=True)
     for pdb_file in filtered_pdb_files:
         src = os.path.join(pdb_directory, pdb_file)
