@@ -29,7 +29,6 @@ rog_value=5
 target_seq="KPFEIIILLTIFANCVALAIYIPFPEDDSNATNSNLERVEYLFLIIFTVEAFLKVIAYGLLFHPNAYLRNGWNLLDFIIVVVGLFSAILEQATKADGANALGGKGAGFDVKALRAFRVLRPLRLVSGVPSLQVVLNSIIKAMVPLLHIALLVLFVIIIYAIIGLELFMGKMHKTCYNQEGIADVPAEDDPSPCALETGHGRQCQNGTVCKPGWDGPKHGITNFDNFAFAMLTVFQCITMEGWTDVLYWVNDAVGRDWPWIYFVTLIIIGSFFVLNLVLGVLSGEFSKEREKAKARGDFQKLREKQQLEEDLKGYLDWITQAEDIDPENEDEGMDEEKPRNMSMPTSETESVNTENVAGGDIEGENCGARLAHRISKSKFSRYWRRWNRFCRRKCRAAVKSNVFYWLVIFLVFLNTLTIASEHYNQPNWLTEVQDTANKALLALFTAEMLLKMYSLGLQAYFVSLFNRFDCFVVCGGILETILVETKIMSPLGISVLRCVRLLRIFKITRYWNSLSNLVASLLNSVRSIASLLLLLFLFIIIFSLLGMQLFGGKFNFDEMQTRRSTFDNFPQSLLTVFQILTGEDWNSVMYDGIMAYGGPSFPGMLVCIYFIILFICGNYILLNVFLAIAVDNLADAESLTSAQKEEEEEKERKKLARTASPEKKQELVEKPAVGESKEEKIELKSITADGESPPATKINMDDLQPNENEDKSPYPNPETTGEEDEEEPEMPVGPRPRPLSELHLKEKAVPMPEASAFFIFSSNNRFRLQCHRIVNDTIFTNLILFFILLSSISLAAEDPVQHTSFRNHILFYFDIVFTTIFTIEIALKILGNADYVFTSIFTLEIILKMTAYGAFLHKGSFCRNYFNILDLLVVSVSLISFGIQSSAINVVKILRVLRVLRPLRAINRAKGLKHVVQCVFVAIRTIGNIVIVTTLLQFMFACIGVQLFKGKLYTCSDSSKQTEAECKGNYITYKDGEVDHPIIQPRSWENSKFDFDNVLAAMMALFTVSTFEGWPELLYRSIDSHTEDKGPIYNYRVEISIFFIIYIIIIAFFMMNIFVGFVIVTFQEQGEQEYKNCELDKNQRQCVEYALKARPLRRYIPKNQHQYKVWYVVNSTYFEYLMFVLILLNTICLAMQHYGQSCLFKIAMNILNMLFTGLFTVEMILKLIAFKPKGYFSDPWNVFDFLIVIGSIIDVILSETNHYFCDAWNTFDALIVVGSIVDIAITEVNPAEHTQCSPSMNAEENSRISITFFRLFRVMRLVKLLSRGEGIRTLLWTFIKSFQALPYVALLIVMLFFIYAVIGMQVFGKIALNDTTEINRNNNFQTFPQAVLLLFRCATGEAWQDIMLACMPGKKCAPESEPSNSTEGETPCGSSFAVFYFISFYMLCAFLIINLFVAVIMDN"
 
 
-
 source /share/yarovlab/ahgz/.bashrc
 conda activate base
 
@@ -64,7 +63,7 @@ sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/1-run_backboneDesign.sh 
 conda activate base
 
 # Filter 1.1: Radious of gyration (ROG) and also calculates "sphericality" but only filtering by ROG
-python3 /share/yarovlab/ahgz/scripts/binderDesign/1_1_filter_RoG.py \
+python3 /share/yarovlab/ahgz/scripts/binderDesign/1_4_normRoG.py \
     --input-dir "$project_path/1-BackboneDesign/T30/" \
     --chain A \
     --output-dir "$project_path/1.5-FilteringBackbones/" \
@@ -80,17 +79,20 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/1_1_filter_RoG.py \
 # Step 2: Sequence Design with Ligand MPNN
 #Generate sequences with Soluble MPNN chain A is always binder in RFDiffusion
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/2_sequenceDesign_ligandMPNN_de_novo.sh \
-    -f "$project_path/1.5-FilteringBackbones/visually_inspected/" \
-    -o "$project_path/2-SequenceDesign/" \
-    -c 'A'
+    --input-dir  "$project_path/1.5-FilteringBackbones/visually_inspected/" \
+    --output-dir "$project_path/2-SequenceDesign/" \
+    --chains-to-design 'A' \
+    --num-seqs 30
 
 
 # Step 3: Foldability Test of binder only
 # Part 3.1: actually running AF2 for all sequences, this is the slowest step in my experience
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_runAF2_monomer.sh \
-    -s "$project_path/2-SequenceDesign/seqs/" \
-    -a "$project_name" \
-    -o "$project_path/3-FoldabilityTest/af2_output/"
+    --seqs-dir "$project_path/2-SequenceDesign/seqs/" \
+    --output-dir "$project_path/3-FoldabilityTest/af2_output/" \
+    --project-name $project_name \
+    --num-parallel 4
+
 
 conda activate base
 mkdir -p "$project_path"/3-FoldabilityTest/foldability_results/
@@ -100,7 +102,7 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/3_foldabilityTest_filter_plot.
     --af-models "$project_path/3-FoldabilityTest/af2_output/" \
     --rfdiff-backbones "$project_path/1.5-FilteringBackbones/visually_inspected/" \
     --output-dir "$project_path/3-FoldabilityTest/foldability_results/" \
-    --plddt_threshold 90\
+    --plddt_threshold 90 \
     --rmsd_threshold 2
 
 echo "Foldability test monomer completed for project: $project_name"

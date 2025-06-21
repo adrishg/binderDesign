@@ -11,32 +11,30 @@ source /share/yarovlab/ahgz/.bashrc
 conda activate /share/yarovlab/ahgz/apps/localcolabfold/colabfold-conda/
 module load gcc/13.2.0
 
-# Usage message
+# Default number of parallel jobs
+NUM_PARALLEL=4
+
+# Usage function
 usage() {
-    echo "Usage: $0 [-s SEQ_FOLDER] [-o OUTPUT_DIR_BASE] [-a ALIAS_PREFIX]"
-    echo "  -s SEQ_FOLDER       Path to the folder containing FASTA files"
-    echo "  -o OUTPUT_DIR_BASE  Base output directory"
-    echo "  -a ALIAS_PREFIX     Alias prefix (e.g., Cav12)"
+    echo "Usage: $0 --seqs-dir DIR --output-dir DIR --project-name NAME [--num-parallel N]"
     exit 1
 }
 
 # Argument parsing
-while getopts ":s:o:a:h" opt; do
-    case ${opt} in
-        s ) SEQ_FOLDER=$OPTARG ;;
-        o ) OUTPUT_DIR_BASE=$OPTARG ;;
-        a ) ALIAS_PREFIX=$OPTARG ;;
-        h ) usage ;;
-        \? ) usage ;;
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --seqs-dir) SEQ_FOLDER="$2"; shift 2 ;;
+        --output-dir) OUTPUT_DIR_BASE="$2"; shift 2 ;;
+        --project-name) ALIAS_PREFIX="$2"; shift 2 ;;
+        --num-parallel) NUM_PARALLEL="$2"; shift 2 ;;
+        -h|--help) usage ;;
+        *) echo "Unknown option: $1"; usage ;;
     esac
 done
 
-# Validate input
-if [[ -z "$SEQ_FOLDER" || -z "$OUTPUT_DIR_BASE" || -z "$ALIAS_PREFIX" ]]; then
-    usage
-fi
+[[ -z "$SEQ_FOLDER" || -z "$OUTPUT_DIR_BASE" || -z "$ALIAS_PREFIX" ]] && usage
 
-# Process each FASTA file in the folder
+# Process each FASTA file
 for fasta_file in "$SEQ_FOLDER"/*.fa; do
     base_name=$(basename "$fasta_file" .fa)
     output_dir="$OUTPUT_DIR_BASE/$base_name"
@@ -54,22 +52,19 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
     original_header=""
     header_written=0
 
+    # Step 1: Process sequences
     while IFS= read -r line || [[ -n "$line" ]]; do
         if [[ "$line" =~ ^\> ]]; then
-            # Write previous sequence if valid
             if [[ -n "$current_seq" && $header_written -eq 1 ]]; then
                 truncated_seq="${current_seq%%:*}"
                 if [[ "$truncated_seq" =~ ^G+$ ]]; then
-                    echo "Skipping all-Glycine sequence for $current_alias"
-                    sed -i '$d' "$processed_fasta"  # remove previous header line
-                    ((seq_counter--))  # undo alias increment
+                    sed -i '$d' "$processed_fasta"
+                    ((seq_counter--))
                 else
                     echo "$truncated_seq" >> "$processed_fasta"
                     echo "$current_alias,\"$original_header\",$truncated_seq" >> "$reference_csv"
                 fi
             fi
-
-            # Prepare for new sequence
             original_header=${line#>}
             current_alias="${ALIAS_PREFIX}_${base_name}_${seq_counter}"
             echo ">$current_alias" >> "$processed_fasta"
@@ -81,19 +76,30 @@ for fasta_file in "$SEQ_FOLDER"/*.fa; do
         fi
     done < "$fasta_file"
 
-    # Final sequence
     if [[ -n "$current_seq" && $header_written -eq 1 ]]; then
         truncated_seq="${current_seq%%:*}"
         if [[ "$truncated_seq" =~ ^G+$ ]]; then
-            echo "Skipping all-Glycine sequence for $current_alias"
-            sed -i '$d' "$processed_fasta"  # remove header line
+            sed -i '$d' "$processed_fasta"
         else
             echo "$truncated_seq" >> "$processed_fasta"
             echo "$current_alias,\"$original_header\",$truncated_seq" >> "$reference_csv"
         fi
     fi
 
-    # Run ColabFold
-    echo "Running ColabFold on: $processed_fasta"
-    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch --msa-mode single_sequence --num-recycle 3 --num-seed 3 "$processed_fasta" "$output_dir"
+    # Step 2: Split into batches
+    split_dir="$output_dir/split_batches"
+    mkdir -p "$split_dir"
+    awk -v n=$NUM_PARALLEL -v out="$split_dir/batch" '
+        /^>/ {if (seq) print seq > (out file_count ".fa"); file_count = (file_count+1)%n; print > (out file_count ".fa"); seq=""}
+        !/^>/ {seq=seq $0}
+        END {if (seq) print seq > (out file_count ".fa")}
+    ' "$processed_fasta"
+
+# Step 3: Run in parallel
+    echo "Launching $NUM_PARALLEL parallel ColabFold jobs for $base_name"
+    parallel -j $NUM_PARALLEL CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES colabfold_batch \
+        --msa-mode single_sequence \
+        --num-recycle 3 \
+        --num-seed 2 \
+        {} "$output_dir" ::: "$split_dir"/batch*.fa
 done
