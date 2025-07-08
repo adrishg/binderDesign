@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -p gpu-vladimir
+#SBATCH -p production
 #SBATCH -t 2-12:00:00
 #SBATCH --job-name=sapCalculation
 #SBATCH --mem=4G
