@@ -112,7 +112,7 @@ echo "Foldability test monomer completed for project: $project_name"
 # Part 3.5 (NEW!): Filter monomers by SAP score
 #Part 6.2: Run SAP for monomer
 sbatch --wait /share/yarovlab/ahgz/scripts/binderDesign/6_2_runSAP.sh \
-  --input_pdb "$project_path/6-ExtraMetrics/monomerInputs/*.pdb" \
+  --input_pdb "$project_path/3-FoldabilityTest/foldability_results/models/*.pdb" \
   --scorefile "$project_path/6-ExtraMetrics/sap.sc"
 
 #Part 6.4: Scorefiles to CSVs
@@ -121,11 +121,17 @@ python3 /share/yarovlab/ahgz/scripts/binderDesign/6_4_sc2csv.py \
    --input-score-path "$project_path/6-ExtraMetrics/sap.sc" \
    --output-csv "$project_path/6-ExtraMetrics/sap.csv"
 
-python3 filter_normalized_sap_and_copy.py \
+#Part 6.4.1: Normalize sap
+python3 /share/yarovlab/ahgz/scripts/binderDesign/normalize_sap.py \
   --input_csv "$project_path/6-ExtraMetrics/sap.csv" \
-  --input_dir "$project_path/6-ExtraMetrics/monomerInputs" \
-  --output_dir "$project_path/6-ExtraMetrics/sapFiltered" \
-  --threshold-norm-sap 0.5
+  --output_csv "$project_path/6-ExtraMetrics/sap_normalized.csv"
+
+python filter_by_sap.py \
+  --csv-file "$project_path/6-ExtraMetrics/sap_normalized.csv" \
+  --fasta-file "$project_path/3-FoldabilityTest/foldability_results/filtered_passed_seqs.fasta" \
+  --output-dir "$project_path/3-FoldabilityTest/" \
+  --n-sap-cutoff 0.45
+
 
 ############################################################################################
 

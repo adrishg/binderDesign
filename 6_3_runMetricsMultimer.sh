@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -p production
+#SBATCH -p gpu-vladimir
 #SBATCH -t 2-12:00:00
 #SBATCH --job-name=metric_multimer
-#SBATCH --mem=24G
+#SBATCH --mem=4G
 #SBATCH --mail-user=ahgonzalez@ucdavis.edu
 #SBATCH --mail-type=END
 
