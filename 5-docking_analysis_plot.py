@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 import re
 import argparse
@@ -150,6 +152,10 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             print(f"[WARN] No valid numeric data after cleaning for {subdir}, skipping plots and funnelness calculation.")
             continue
 
+        # Attempt to extract clean backbone_id_seq in format number_number
+        match = re.search(r'(\d+_\d+)', subdir)
+        clean_backbone_id_seq = match.group(1) if match else subdir  # fallback to original if no match
+
         # --- Plotting function for reusability ---
         def create_plot(dataframe, x_col, y_col, plot_title_suffix, filename_suffix):
             fig = plt.figure(figsize=(10, 8))
@@ -159,67 +165,59 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
             hist_y = plt.subplot(gs[1:, -1], sharey=scatter_ax)
 
             cmap = sns.color_palette("rocket", as_cmap=True)
-            
-            # Use quantiles for normalization to handle outliers gracefully
+
             q_low = dataframe['total_score'].quantile(0.05)
             q_high = dataframe['total_score'].quantile(0.95)
             norm = Normalize(vmin=q_low, vmax=q_high)
             colors = cmap(norm(dataframe['total_score']))
 
-            # Scatter plot
             scatter_ax.scatter(dataframe[x_col], dataframe[y_col], c=colors, alpha=0.7, s=50)
             scatter_ax.set_xlabel(x_col.replace('_', ' ').upper(), fontsize=14)
             scatter_ax.set_ylabel(y_col.replace('_', ' ').upper(), fontsize=14)
-            scatter_ax.set_title(f"{project_name} - {subdir} {plot_title_suffix}", fontsize=16)
+            scatter_ax.set_title(f"{project_name} - {clean_backbone_id_seq} {plot_title_suffix}", fontsize=16)
 
-            # Histograms
             bins = 30
             hist_x_vals, hist_x_edges = np.histogram(dataframe[x_col], bins=bins)
             hist_y_vals, hist_y_edges = np.histogram(dataframe[y_col], bins=bins)
 
-            # Normalize histogram colors based on value range for visual consistency
             norm_hist_x = Normalize(vmin=hist_x_edges.min(), vmax=hist_x_edges.max())
             norm_hist_y = Normalize(vmin=hist_y_edges.min(), vmax=hist_y_edges.max())
 
             for i in range(len(hist_x_vals)):
                 hist_x.bar(hist_x_edges[i], hist_x_vals[i], width=hist_x_edges[i+1]-hist_x_edges[i],
-                           color=cmap(norm_hist_x(hist_x_edges[i])), alpha=0.7, align='edge') # Removed edgecolor and linewidth
+                           color=cmap(norm_hist_x(hist_x_edges[i])), alpha=0.7, align='edge')
 
             for i in range(len(hist_y_vals)):
                 hist_y.barh(hist_y_edges[i], hist_y_vals[i], height=hist_y_edges[i+1]-hist_y_edges[i],
-                            color=cmap(norm_hist_y(hist_y_edges[i])), alpha=0.7, align='edge') # Removed edgecolor and linewidth
+                            color=cmap(norm_hist_y(hist_y_edges[i])), alpha=0.7, align='edge')
 
             hist_x.set_ylabel('Frequency', fontsize=12)
             hist_y.set_xlabel('Frequency', fontsize=12)
             hist_x.tick_params(axis='x', labelbottom=False, labelsize=10)
             hist_y.tick_params(axis='y', labelleft=False, labelsize=10)
 
-            plt.tight_layout() # Reverted to default tight_layout
+            plt.tight_layout()
 
-            plot_path = os.path.join(results_dir, f"{subdir}_{filename_suffix}.png")
+            plot_path = os.path.join(results_dir, f"{clean_backbone_id_seq}_{filename_suffix}.png")
             plt.savefig(plot_path)
             plt.close()
             print(f"[INFO] Plot saved to {plot_path}")
 
-        # Generate RMSD vs dG_cross plot
+        # Generate plots
         create_plot(df, 'rms', 'dG_cross', 'RMSD vs dG_cross', 'scatter_dG_cross')
-
-        # Generate RMSD vs I_sc plot
         create_plot(df, 'rms', 'I_sc', 'RMSD vs I_sc', 'scatter_I_sc')
-
 
         # --- Prepare summary data and calculate funnelness ---
         dg_row = df.loc[df['dG_cross'].idxmin()]
         rmsd_row = df.loc[df['rms'].idxmin()]
         isc_row = df.loc[df['I_sc'].idxmin()]
 
-        # Calculate funnelness scores
         funnelness_dg = calculate_funnelness(df, 'dG_cross')
         funnelness_isc = calculate_funnelness(df, 'I_sc')
 
         summary = pd.DataFrame([{
             "project": project_name,
-            "backbone_id_seq": subdir,
+            "backbone_id_seq": clean_backbone_id_seq,
             "lowest_dG_cross_pose": dg_row['description'],
             "lowest_dG_cross_value": dg_row['dG_cross'],
             "rmsd_of_lowest_dG_cross": dg_row['rms'],
@@ -234,6 +232,7 @@ def create_colored_scatter_plot_for_all(main_output_dir, project_name, results_d
         }])
 
         all_summaries.append(summary)
+
 
     # Concatenate all individual summaries into one master summary CSV
     if all_summaries:
