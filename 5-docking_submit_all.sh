@@ -40,19 +40,21 @@ job_ids=()
 for pdb in "$input_dir"/*.pdb; do
     original_name=$(basename "$pdb" .pdb)
 
-    # Extract "project__backbone_seq" from long name
-    if [[ "$original_name" =~ (.+__[^.]+) ]]; then
-        short_name="${BASH_REMATCH[1]}"
+    # Default short name is original base name
+    short_name="$original_name"
+
+    # Try to extract backbone_id_seq in form number_number
+    if [[ "$original_name" =~ ([0-9]+_[0-9]+) ]]; then
+        backbone_seq="${BASH_REMATCH[1]}"
     else
-        echo "[WARN] Skipping unrecognized name format: $original_name"
-        continue
+        echo "[WARN] Could not extract backbone_id_seq from: $original_name"
+        backbone_seq="unknown"
     fi
 
     # Copy and rename
     cp "$pdb" "$renamed_dir/${short_name}.pdb"
 
     # Set up output folder
-    backbone_seq=$(echo "$short_name" | awk -F '__' '{print $2}')
     output_dir="$jobs_dir/$backbone_seq"
     mkdir -p "$output_dir"
 
