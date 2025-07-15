@@ -104,17 +104,13 @@ def process_pdb_files(af_models, rfdiff_backbones, robust=False):
     return df
 
 def create_combined_fasta(filtered_df, output_fasta_path):
+    # Drop duplicates based on backbone_id_seq
+    deduped_df = filtered_df.drop_duplicates(subset=["backbone", "sequence_id"])
     with open(output_fasta_path, 'w') as f:
-        for _, row in filtered_df.iterrows():
-            filename = row['file_name']
-            sequence = row['sequence']
-            header = "unknown_id"
+        for _, row in deduped_df.iterrows():
+            header = f"{row['backbone']}_{row['sequence_id']}"
+            f.write(f">{header}\n{row['sequence']}\n")
 
-            if "_unrelaxed" in filename:
-                prefix = filename.split("_unrelaxed")[0]
-                header = prefix
-
-            f.write(f">{header}\n{sequence}\n")
 
 def main(args):
     os.makedirs(args.output_dir, exist_ok=True)
@@ -247,16 +243,24 @@ def main(args):
 
         # Handle filtered data
         if not filtered_data.empty:
+            # Save filtered CSV
             filtered_data.to_csv(output_filtered_csv, index=False)
-            create_combined_fasta(filtered_data, output_fasta)
             summary.append(f"Filtered results saved to {output_filtered_csv}")
-            
-            # Copy filtered models
-            for _, row in filtered_data.iterrows():
+
+            # Filter unique backbone+sequence_id combos
+            unique_models = filtered_data.drop_duplicates(subset=["backbone", "sequence_id"])
+
+            # Copy one model per backbone_id_seq
+            for _, row in unique_models.iterrows():
                 src = os.path.join(args.af_models, row['backbone'], row['file_name'])
-                dst = os.path.join(model_dir, row['backbone'] + "_" + row['file_name'])
+                dst = os.path.join(model_dir, f"{row['backbone']}_{row['file_name']}")
                 if os.path.isfile(src):
                     shutil.copy(src, dst)
+
+            # Create FASTA using the same filtered unique_models
+            create_combined_fasta(unique_models, output_fasta)
+
+
         else:
             summary.append("No models passed thresholds.")
 
