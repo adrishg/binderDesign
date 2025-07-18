@@ -284,4 +284,93 @@ def main(args):
         color_map = dict(zip(backbones, colors))
 
         # Plot all models
-        p
+        passed_color = '#66d24e' # Define the passed color
+        for bb in backbones:
+            bb_data = df[df['backbone'] == bb]
+            plt.scatter(
+                bb_data['rmsd'],
+                bb_data['plddt'],
+                s=100,
+                c=[color_map[bb]] * len(bb_data),
+                edgecolors=np.where(bb_data['passed'], passed_color, 'k'), # Use passed_color for border
+                linewidth=1.5,
+                alpha=0.8,
+                label=f"{bb} (Seqs: {len(sequence_stats[sequence_stats['backbone'] == bb])})"
+            )
+
+        # Threshold lines
+        plt.axhline(args.plddt_threshold, color='r', linestyle='--', label=f'pLDDT > {args.plddt_threshold}')
+        plt.axvline(args.rmsd_threshold, color='b', linestyle='--', label=f'RMSD < {args.rmsd_threshold}')
+        
+        # Legend and labels
+        plt.xlabel("RMSD (Å)")
+        plt.ylabel("pLDDT")
+        plt.title(f"Foldability test{' - Robust Mode' if args.robust else ''}")
+        plt.legend(
+            title=legend_title,
+            bbox_to_anchor=(1.05, 1),
+            loc='upper left',
+            frameon=True,
+            markerscale=1.5
+        )
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(output_plot, bbox_inches='tight')
+        summary.append(f"Plot saved to {output_plot}")
+
+        # Handle filtered data
+        if not filtered_data.empty:
+            # Save filtered CSV
+            filtered_data.to_csv(output_filtered_csv, index=False)
+            summary.append(f"Filtered results saved to {output_filtered_csv}")
+
+            # Filter unique backbone+sequence_id combos for copying and FASTA generation
+            unique_models = filtered_data.drop_duplicates(subset=["backbone", "sequence_id"])
+
+            # Copy one model per unique backbone_id_seq combination
+            for _, row in unique_models.iterrows():
+                src = os.path.join(args.af_models, row['backbone'], row['file_name'])
+                dst = os.path.join(model_dir, f"{row['backbone']}_{row['file_name']}")
+                if os.path.isfile(src):
+                    shutil.copy(src, dst)
+            summary.append(f"Copied {len(unique_models)} unique passed models to {model_dir}")
+
+            # Create FASTA using the same filtered unique_models, passing the project name
+            create_combined_fasta(unique_models, output_fasta, args.project_name)
+            summary.append(f"Filtered FASTA saved to {output_fasta}")
+
+        else:
+            summary.append("No models passed thresholds.")
+
+    else:
+        summary.append("No data processed. DataFrame is empty.")
+
+    # Write summary to file
+    with open(output_summary, 'w') as f:
+        f.write("\n".join(summary))
+
+    print("Done. Summary saved to", output_summary)
+
+if __name__ == "__main__":
+    print("=== Starting foldability test script ===")
+    parser = argparse.ArgumentParser(description='Analyze AlphaFold models against RFdiffusion backbones.')
+    parser.add_argument('--af-models', required=True, help='Path to AlphaFold model folders (e.g., directory containing backbone_id subfolders)')
+    parser.add_argument('--rfdiff-backbones', required=True, help='Path to RFdiffusion backbone reference PDBs (e.g., directory containing backbone_id.pdb files)')
+    parser.add_argument('--output-dir', required=True, help='Output directory for results (CSV, plot, FASTA, copied models)')
+    parser.add_argument('--plddt_threshold', type=float, default=90.0, help='Minimum pLDDT score for a model to pass.')
+    parser.add_argument('--rmsd_threshold', type=float, default=2.0, help='Maximum RMSD (Å) for a model to pass.')
+    parser.add_argument('--robust', action='store_true', help='Enable robust processing: evaluate all models (not just rank_001) and filter sequences based on --min_passed.')
+    parser.add_argument('--min_passed', type=int, default=1,
+                        help='[Robust mode only] Minimum number of models per seed that must pass thresholds for that seed to be considered valid.')
+    parser.add_argument('--project_name', type=str, default="binder_",
+                        help='Optional project name to prepend to FASTA identifiers (e.g., >projectName__backbone_id_seq).')
+    
+    args = parser.parse_args()
+    
+    # Validation checks for arguments
+    if not args.robust and args.min_passed != 1:
+        print("Warning: --min_passed is ignored in standard (non-robust) mode.")
+    if args.robust and args.min_passed < 1:
+        raise ValueError("--min_passed must be ≥1 in robust mode.")
+
+    main(args)
